@@ -37,7 +37,26 @@
                     <strong>Information :</strong> Votre réclamation sera envoyée au technicien responsable du laboratoire concerné.
                   </div>
 
-                  <!-- Laboratoire (seuls les labos ACTIFS sont affichés) -->
+                  <!-- Département -->
+                  <div class="form-group">
+                    <label for="departement">
+                      <i class="fas fa-building mr-1"></i> Département <span class="text-danger">*</span>
+                    </label>
+                    <select 
+                      id="departement"
+                      class="form-control" 
+                      v-model="selectedDeptId" 
+                      @change="onDepartementChange"
+                      required
+                    >
+                      <option disabled value="">Sélectionnez un département</option>
+                      <option v-for="dept in departements" :key="dept.id" :value="dept.id">
+                        {{ dept.nom }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <!-- Laboratoire (filtré par département, ACTIFS uniquement) -->
                   <div class="form-group">
                     <label for="laboratoire">
                       <i class="fas fa-flask mr-1"></i> Laboratoire <span class="text-danger">*</span>
@@ -47,14 +66,15 @@
                       class="form-control" 
                       v-model="selectedLaboId" 
                       @change="loadEquipements"
+                      :disabled="!selectedDeptId"
                       required
                     >
-                      <option disabled value="">Sélectionnez un laboratoire</option>
-                      <option v-for="labo in laboratoiresActifs" :key="labo.id" :value="labo.id">
+                      <option disabled value="">{{ !selectedDeptId ? 'Sélectionnez d\'abord un département' : 'Sélectionnez un laboratoire' }}</option>
+                      <option v-for="labo in filteredLaboratoires" :key="labo.id" :value="labo.id">
                         {{ labo.nomLabo || labo.nom }}
                       </option>
                     </select>
-                    <small class="text-muted" v-if="laboratoiresInactifs > 0">
+                    <small class="text-muted" v-if="selectedDeptId && laboratoiresInactifs > 0">
                       <i class="fas fa-info-circle mr-1"></i>
                       {{ laboratoiresInactifs }} laboratoire(s) inactif(s) masqué(s)
                     </small>
@@ -152,8 +172,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getMesLabos } from '@/Service/LaboratoireService'
+import { getLaboratoires } from '@/Service/LaboratoireService'
 import { getEquipementsByLabo } from '@/Service/EquipementService'
+import { getActiveDepartements } from '@/Service/departementService'
 import ReclamationService from '@/Service/ReclamationService'
 
 interface Laboratoire { id: number; nomLabo: string; nom?: string }
@@ -162,8 +183,10 @@ interface Equipement { id: number; nom: string; etat?: string; identifiant?: str
 const route = useRoute()
 const router = useRouter()
 
+const departements = ref<any[]>([])
 const laboratoires = ref<Laboratoire[]>([])
 const equipements = ref<Equipement[]>([])
+const selectedDeptId = ref<number | "">("")
 const selectedLaboId = ref<number | "">("")
 const selectedEquipementId = ref<number | "">("")
 const description = ref<string>("")
@@ -171,21 +194,25 @@ const quantite = ref<number>(1)
 const priorite = ref<string>("MOYENNE")
 const isSubmitting = ref(false)
 
-// Filtrer les laboratoires ACTIFS uniquement
-const laboratoiresActifs = computed(() => 
-  laboratoires.value.filter(labo => {
-    const etat = (labo as any).etatLabo
-    return etat === 'ACTIF'
+// Laboratoires filtrés par département sélectionné (ACTIFS uniquement)
+const filteredLaboratoires = computed(() => {
+  if (!selectedDeptId.value) return []
+  return laboratoires.value.filter(labo => {
+    const matchDept = (labo as any).departementId === selectedDeptId.value || (labo as any).departement?.id === selectedDeptId.value
+    const isActif = (labo as any).etatLabo === 'ACTIF'
+    return matchDept && isActif
   })
-)
+})
 
-// Compter les labos inactifs masqués
-const laboratoiresInactifs = computed(() => 
-  laboratoires.value.filter(labo => {
-    const etat = (labo as any).etatLabo
-    return etat !== 'ACTIF'
+// Compter les labos inactifs masqués dans le département sélectionné
+const laboratoiresInactifs = computed(() => {
+  if (!selectedDeptId.value) return 0
+  return laboratoires.value.filter(labo => {
+    const matchDept = (labo as any).departementId === selectedDeptId.value || (labo as any).departement?.id === selectedDeptId.value
+    const isInactif = (labo as any).etatLabo !== 'ACTIF'
+    return matchDept && isInactif
   }).length
-)
+})
 
 // Tous les équipements sont réclamables
 const equipementsReclamables = computed(() => equipements.value)
@@ -204,26 +231,42 @@ function formatEtat(etat?: string): string {
   return labels[etat] || etat
 }
 
-// Charger les laboratoires du département de l'étudiant
-async function loadLaboratoires() {
+// Quand le département change
+function onDepartementChange() {
+  selectedLaboId.value = ""
+  selectedEquipementId.value = ""
+  equipements.value = []
+}
+
+// Charger les départements et laboratoires
+async function loadData() {
   try {
-    const res = await getMesLabos()
-    laboratoires.value = Array.isArray(res.data) ? res.data : []
+    const [deptRes, laboRes] = await Promise.all([getActiveDepartements(), getLaboratoires()])
+    departements.value = Array.isArray(deptRes.data) ? deptRes.data : []
+    laboratoires.value = Array.isArray(laboRes.data) ? laboRes.data : []
+    console.log("Départements chargés:", departements.value)
     console.log("Laboratoires chargés:", laboratoires.value)
     
     // Si on arrive avec un laboratoireId dans l'URL, le pré-sélectionner
     if (route.query.laboratoireId) {
       const laboId = Number(route.query.laboratoireId)
-      selectedLaboId.value = laboId
-      await loadEquipements()
-      
-      // Si on a aussi un equipementId, le pré-sélectionner
-      if (route.query.equipementId) {
-        selectedEquipementId.value = Number(route.query.equipementId)
+      const labo = laboratoires.value.find(l => l.id === laboId)
+      if (labo) {
+        const deptId = (labo as any).departementId || (labo as any).departement?.id
+        if (deptId) {
+          selectedDeptId.value = deptId
+        }
+        selectedLaboId.value = laboId
+        await loadEquipements()
+        
+        // Si on a aussi un equipementId, le pré-sélectionner
+        if (route.query.equipementId) {
+          selectedEquipementId.value = Number(route.query.equipementId)
+        }
       }
     }
   } catch (e) {
-    console.error("Erreur chargement laboratoires:", e)
+    console.error("Erreur chargement données:", e)
   }
 }
 
@@ -274,7 +317,7 @@ async function handleSubmit() {
 }
 
 onMounted(() => {
-  loadLaboratoires()
+  loadData()
 })
 </script>
 

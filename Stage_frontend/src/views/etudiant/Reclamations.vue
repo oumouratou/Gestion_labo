@@ -18,11 +18,11 @@
             <table class="table table-bordered table-striped table-hover" v-if="reclamations.length">
               <thead class="bg-info text-white">
                 <tr>
-                  <th>ID</th>
+                  <th>N°</th>
                   <th>Laboratoire</th>
                   <th>Équipement</th>
                   <th>Description</th>
-                  <th>Quantité</th>
+                  <th>Identifiant Équipement</th>
                   <th>Priorité</th>
                   <th>État</th>
                   <th>Date</th>
@@ -31,16 +31,16 @@
               </thead>
               <tbody>
                 <tr 
-                  v-for="rec in reclamations" 
+                  v-for="(rec, index) in reclamations" 
                   :key="rec.id"
                   :class="{ 'highlight-row': highlightedId === rec.id }"
                   :ref="el => { if (highlightedId === rec.id) highlightedRow = el }"
                 >
-                  <td>{{ rec.id }}</td>
+                  <td>{{ index + 1 }}</td>
                   <td>{{ rec.laboratoireNom || 'N/A' }}</td>
                   <td>{{ rec.equipementNom || 'N/A' }}</td>
                   <td>{{ rec.description }}</td>
-                  <td>{{ rec.quantite }}</td>
+                  <td><code class="text-primary">{{ getEquipementIdentifiant(rec) }}</code></td>
                   <td>
                     <span :class="getPrioriteBadge(getPriorite(rec))">
                       {{ formatPriorite(getPriorite(rec)) }}
@@ -56,14 +56,14 @@
                     <button
                       class="btn btn-warning btn-sm"
                       @click="openModal(rec)"
-                      v-if="rec.etat === 'NON_TRAITEE'"
+                      :disabled="rec.etat !== 'NON_TRAITEE'"
                     >
                       <i class="fas fa-edit mr-1"></i> Modifier
                     </button>
                     <button
                       class="btn btn-danger btn-sm"
                       @click="annulerReclamation(rec.id)"
-                      v-if="rec.etat === 'NON_TRAITEE'"
+                      :disabled="rec.etat !== 'NON_TRAITEE'"
                     >
                       <i class="fas fa-times mr-1"></i> Annuler
                     </button>
@@ -100,10 +100,6 @@
                 <label>Description</label>
                 <textarea class="form-control" v-model="form.description" required></textarea>
               </div>
-              <div class="form-group">
-                <label>Quantité</label>
-                <input type="number" min="1" class="form-control" v-model.number="form.quantite" required />
-              </div>
             </div>
 
             <div class="modal-footer">
@@ -122,6 +118,7 @@
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import ReclamationService from '@/Service/ReclamationService'
+import { getEquipements } from '@/Service/EquipementService'
 
 const route = useRoute()
 
@@ -139,11 +136,37 @@ interface Reclamation {
 }
 
 const reclamations = ref<Reclamation[]>([])
+const allEquipements = ref<any[]>([])
 const showModal = ref(false)
 const form = reactive({ id: 0, description: '', quantite: 1 })
 const highlightedId = ref<number | null>(null)
 const highlightedRow = ref<any>(null)
+// 🔹 Charger les équipements pour récupérer les identifiants
+async function fetchEquipements() {
+  try {
+    const res = await getEquipements()
+    allEquipements.value = Array.isArray(res.data) ? res.data : []
+  } catch (err) {
+    console.error('Erreur chargement équipements:', err)
+    allEquipements.value = []
+  }
+}
 
+function getEquipementIdentifiant(rec: any): string {
+  const equipId = rec.equipementId || rec.equipement?.id
+  if (rec.equipementIdentifiant || rec.identifiantEquipement) {
+    return rec.equipementIdentifiant || rec.identifiantEquipement
+  }
+  if (equipId) {
+    const equip = allEquipements.value.find((e: any) => e.id === equipId)
+    if (equip?.identifiant) return equip.identifiant
+    if (equip) {
+      const prefix = (equip.nom || 'EQ').substring(0, 3).toUpperCase()
+      return `${prefix}-${String(equip.id).padStart(4, '0')}`
+    }
+  }
+  return 'N/A'
+}
 // 🔹 Charger les réclamations de l'étudiant connecté (triées par date décroissante)
 async function fetchReclamations() {
   try {
@@ -260,6 +283,7 @@ function formatDate(date: string) {
 }
 
 onMounted(async () => {
+  await fetchEquipements()
   await fetchReclamations()
   
   // Vérifier si on doit highlight une réclamation (venant d'une notification)

@@ -21,7 +21,7 @@
             <table class="table table-bordered table-striped table-hover" v-if="mesReservations.length > 0">
               <thead class="bg-info">
                 <tr>
-                  <th>ID</th>
+                  <th>N°</th>
                   <th>Laboratoire</th>
                   <th>Date</th>
                   <th>Horaire</th>
@@ -32,12 +32,12 @@
               </thead>
               <tbody>
                 <tr 
-                  v-for="res in mesReservations" 
+                  v-for="(res, index) in mesReservations" 
                   :key="res.id"
                   :class="{ 'highlight-row': highlightedId === res.id }"
                   :ref="el => { if (highlightedId === res.id) highlightedRow = el }"
                 >
-                  <td>{{ res.id }}</td>
+                  <td>{{ index + 1 }}</td>
                   <td>{{ res.laboratoireNom || res.laboratoire?.nomLabo || res.laboratoire?.nom || 'N/A' }}</td>
                   <td>{{ res.dateReservation }}</td>
                   <td>{{ res.heureDebut }} - {{ res.heureFin }}</td>
@@ -48,20 +48,20 @@
                     </span>
                   </td>
                   <td class="d-flex gap-1">
-                    <!-- Modifier uniquement si EN_ATTENTE -->
+                    <!-- Modifier -->
                     <button 
                       class="btn btn-warning btn-sm"
                       @click="openModal(res)"
-                      v-if="res.statut === 'EN_ATTENTE'"
+                      :disabled="res.statut !== 'EN_ATTENTE'"
                     >
                       <i class="fas fa-edit mr-1"></i> Modifier
                     </button>
 
-                    <!-- Annuler uniquement si EN_ATTENTE -->
+                    <!-- Annuler -->
                     <button 
                       class="btn btn-danger btn-sm"
                       @click="annulerReservation(res.id)"
-                      v-if="res.statut === 'EN_ATTENTE'"
+                      :disabled="res.statut !== 'EN_ATTENTE'"
                     >
                       <i class="fas fa-times mr-1"></i> Annuler
                     </button>

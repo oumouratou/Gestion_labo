@@ -40,7 +40,7 @@
             <table class="table table-bordered table-hover">
               <thead class="thead-light">
                 <tr>
-                  <th>ID</th>
+                  <th>N°</th>
                   <th>Nom du labo</th>
                   <th>Département</th>
                   <th>État</th>
@@ -49,8 +49,8 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="labo in labosFiltres" :key="labo.id">
-                  <td>{{ labo.id }}</td>
+                <tr v-for="(labo, index) in labosFiltres" :key="labo.id">
+                  <td>{{ index + 1 }}</td>
                   <td>{{ labo.nomLabo }}</td>
                   <td>{{ labo.departement?.nom || '—' }}</td>
                   <td>
@@ -225,9 +225,9 @@ function openModal(labo?: Laboratoire) {
   if (labo) {
     isEdit.value = true
     editId.value = labo.id
-    form.nomLabo = labo.nomLabo
+    form.nomLabo = labo.nomLabo || labo.nom || ''
     form.departementId = labo.departement?.id || ''
-    form.etatLabo = labo.etatLabo
+    form.etatLabo = labo.etatLabo || ''
   } else {
     isEdit.value = false
     editId.value = null

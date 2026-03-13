@@ -80,7 +80,9 @@ onMounted(async () => {
     // Restaurer automatiquement la dernière session active
     if (sessions.value.length > 0) {
       const lastSession = sessions.value[0]; // sessions triées par updated_at desc
-      await selectSession(lastSession);
+      if (lastSession) {
+        await selectSession(lastSession);
+      }
     } else {
       messages.value.push(getWelcomeMessage());
     }

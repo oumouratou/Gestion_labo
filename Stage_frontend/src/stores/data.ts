@@ -210,14 +210,14 @@ export function useData() {
     const labosIds = laboratoires.value
       .filter(l => l.departementId === departementId)
       .map(l => l.id)
-    return reservations.value.filter(r => labosIds.includes(r.laboratoireId))
+    return reservations.value.filter(r => r.laboratoireId !== undefined && labosIds.includes(r.laboratoireId))
   }
 
   function getReclamationsByLaboratoire(laboratoireId: number) {
     const equipIds = equipements.value
       .filter(e => e.laboratoireId === laboratoireId)
       .map(e => e.id)
-    return reclamations.value.filter(r => equipIds.includes(r.equipementId))
+    return reclamations.value.filter(r => r.equipementId !== undefined && equipIds.includes(r.equipementId))
   }
 
   return {

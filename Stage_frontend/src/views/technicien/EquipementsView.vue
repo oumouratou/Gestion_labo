@@ -24,7 +24,7 @@
             <table class="table table-bordered table-striped table-hover">
               <thead class="bg-success text-white">
                 <tr>
-                  <th>ID</th>
+                  <th>N°</th>
                   <th>Identifiant</th>
                   <th>Nom</th>
                   <th>Caractéristique</th>
@@ -36,8 +36,8 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="equip in equipementsTries" :key="equip.id">
-                  <td>{{ equip.id }}</td>
+                <tr v-for="(equip, index) in equipementsTries" :key="equip.id">
+                  <td>{{ index + 1 }}</td>
                   <td>
                     <code class="text-primary">{{ equip.identifiant || generateIdentifiant(equip) }}</code>
                   </td>

@@ -70,11 +70,11 @@
             <table class="table table-hover text-nowrap" v-if="reclamations.length > 0">
               <thead class="thead-light">
                 <tr>
-                  <th>ID</th>
+                  <th>N°</th>
                   <th>Laboratoire</th>
                   <th>Équipement</th>
                   <th>Description</th>
-                  <th>Quantité</th>
+                  <th>Identifiant Équipement</th>
                   <th>Priorité</th>
                   <th>Date</th>
                   <th>Statut</th>
@@ -84,16 +84,16 @@
 
               <tbody>
                 <tr 
-                  v-for="rec in reclamations" 
+                  v-for="(rec, index) in reclamations" 
                   :key="rec.id"
                   :class="{ 'highlight-row': highlightedId === rec.id }"
                   :ref="el => { if (highlightedId === rec.id) highlightedRow = el }"
                 >
-                  <td><strong>{{ rec.id }}</strong></td>
+                  <td><strong>{{ index + 1 }}</strong></td>
                   <td>{{ rec.laboratoireNom || 'N/A' }}</td>
                   <td>{{ rec.equipementNom || 'N/A' }}</td>
                   <td>{{ truncateText(rec.description, 50) }}</td>
-                  <td>{{ rec.quantite }}</td>
+                  <td><code class="text-primary">{{ getEquipementIdentifiant(rec) }}</code></td>
                   <td>
                     <span :class="getPrioriteBadge(getPriorite(rec))">
                       {{ formatPriorite(getPriorite(rec)) }}
@@ -106,15 +106,14 @@
                     </span>
                   </td>
                   <td class="text-center">
-                    <div class="btn-group" v-if="rec.etat === 'NON_TRAITEE'">
-                      <button class="btn btn-info btn-sm" @click="openModal(rec)" title="Modifier">
-                        <i class="fas fa-edit"></i>
+                    <div class="btn-group">
+                      <button class="btn btn-info btn-sm" @click="openModal(rec)" title="Modifier" :disabled="rec.etat !== 'NON_TRAITEE'">
+                        <i class="fas fa-edit mr-1"></i> Modifier
                       </button>
-                      <button class="btn btn-danger btn-sm" @click="annulerReclamation(rec.id)" title="Annuler">
-                        <i class="fas fa-times"></i>
+                      <button class="btn btn-danger btn-sm" @click="annulerReclamation(rec.id)" title="Annuler" :disabled="rec.etat !== 'NON_TRAITEE'">
+                        <i class="fas fa-times mr-1"></i> Annuler
                       </button>
                     </div>
-                    <span v-else class="text-muted">-</span>
                   </td>
                 </tr>
               </tbody>
@@ -150,10 +149,6 @@
                 <label>Description</label>
                 <textarea class="form-control" v-model="form.description" rows="4" required></textarea>
               </div>
-              <div class="form-group">
-                <label>Quantité</label>
-                <input type="number" min="1" class="form-control" v-model.number="form.quantite" required />
-              </div>
             </div>
 
             <div class="modal-footer">
@@ -172,9 +167,11 @@
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import ReclamationService from '@/Service/ReclamationService'
+import { getEquipements } from '@/Service/EquipementService'
 
 const route = useRoute()
 const reclamations = ref<any[]>([])
+const allEquipements = ref<any[]>([])
 const showModal = ref(false)
 const form = reactive({ id: 0, description: '', quantite: 1 })
 const highlightedId = ref<number | null>(null)
@@ -185,6 +182,32 @@ const pendingCount = computed(() => reclamations.value.filter(r => r.etat === 'N
 const treatedCount = computed(() => reclamations.value.filter(r => r.etat === 'TRAITEE').length)
 const refusedCount = computed(() => reclamations.value.filter(r => r.etat === 'REFUSEE').length)
 const cancelledCount = computed(() => reclamations.value.filter(r => r.etat === 'ANNULEE').length)
+
+async function fetchEquipements() {
+  try {
+    const res = await getEquipements()
+    allEquipements.value = Array.isArray(res.data) ? res.data : []
+  } catch (err) {
+    console.error('Erreur chargement équipements:', err)
+    allEquipements.value = []
+  }
+}
+
+function getEquipementIdentifiant(rec: any): string {
+  const equipId = rec.equipementId || rec.equipement?.id
+  if (rec.equipementIdentifiant || rec.identifiantEquipement) {
+    return rec.equipementIdentifiant || rec.identifiantEquipement
+  }
+  if (equipId) {
+    const equip = allEquipements.value.find((e: any) => e.id === equipId)
+    if (equip?.identifiant) return equip.identifiant
+    if (equip) {
+      const prefix = (equip.nom || 'EQ').substring(0, 3).toUpperCase()
+      return `${prefix}-${String(equip.id).padStart(4, '0')}`
+    }
+  }
+  return 'N/A'
+}
 
 async function fetchReclamations() {
   try {
@@ -215,8 +238,7 @@ async function handleSubmit() {
   try {
     console.log(`Modification réclamation #${form.id}...`);
     await ReclamationService.updateReclamation(form.id, {
-      description: form.description,
-      quantite: form.quantite
+      description: form.description
     });
     alert("✅ Réclamation modifiée avec succès !");
     await fetchReclamations();
@@ -229,8 +251,14 @@ async function handleSubmit() {
 
 async function annulerReclamation(id: number) {
   if (!confirm("Voulez-vous annuler cette réclamation ?")) return
-  await ReclamationService.annulerReclamation(id)
-  await fetchReclamations()
+  try {
+    await ReclamationService.autoAnnulerReclamation(id)
+    alert('✅ Réclamation annulée avec succès.')
+    await fetchReclamations()
+  } catch (error: any) {
+    console.error('Erreur annulation:', error)
+    alert('❌ Erreur: ' + (error.response?.data?.message || error.response?.data || error.message))
+  }
 }
 
 // 🔹 Récupérer la priorité (gérer différents noms de champs)
@@ -291,6 +319,7 @@ function truncateText(text: string, maxLength: number) {
 }
 
 onMounted(async () => {
+  await fetchEquipements()
   await fetchReclamations()
   
   // Vérifier si on doit highlight une réclamation (venant d'une notification)

@@ -144,6 +144,62 @@
 
                   <!-- Onglet Paramètres -->
                   <div v-if="activeTab === 'parametres'" class="tab-pane active" id="parametres">
+                    <!-- Section Mot de passe -->
+                    <div class="settings-section">
+                      <h5 class="settings-title"><i class="fas fa-lock mr-2"></i>Mot de passe</h5>
+                      
+                      <div class="form-group">
+                        <label>Mot de passe actuel</label>
+                        <div class="input-group">
+                          <input 
+                            :type="showPassword ? 'text' : 'password'" 
+                            class="form-control" 
+                            v-model="passwordForm.currentPassword"
+                            placeholder="Votre mot de passe actuel"
+                          >
+                          <div class="input-group-append">
+                            <button class="btn btn-outline-secondary" type="button" @click="showPassword = !showPassword">
+                              <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="form-group">
+                        <label>Nouveau mot de passe</label>
+                        <div class="input-group">
+                          <input 
+                            :type="showNewPassword ? 'text' : 'password'" 
+                            class="form-control" 
+                            v-model="passwordForm.newPassword"
+                            placeholder="Nouveau mot de passe"
+                          >
+                          <div class="input-group-append">
+                            <button class="btn btn-outline-secondary" type="button" @click="showNewPassword = !showNewPassword">
+                              <i :class="showNewPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="form-group">
+                        <label>Confirmer le nouveau mot de passe</label>
+                        <input 
+                          type="password" 
+                          class="form-control" 
+                          v-model="passwordForm.confirmPassword"
+                          placeholder="Confirmer le nouveau mot de passe"
+                        >
+                      </div>
+
+                      <button class="btn btn-primary" @click="handleChangePassword" :disabled="isChangingPassword">
+                        <i class="fas fa-key mr-1"></i>
+                        {{ isChangingPassword ? 'Modification...' : 'Modifier le mot de passe' }}
+                      </button>
+                    </div>
+
+                    <hr>
+
                     <div class="settings-section">
                       <h5 class="settings-title"><i class="fas fa-palette mr-2"></i>Apparence</h5>
                       
@@ -288,6 +344,16 @@ const darkMode = ref(false)
 const selectedAccentColor = ref('#007bff')
 const notificationsEnabled = ref(true)
 const emailNotifications = ref(false)
+
+// Mot de passe
+const showPassword = ref(false)
+const showNewPassword = ref(false)
+const isChangingPassword = ref(false)
+const passwordForm = reactive({
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
 
 const accentColors = [
   { name: 'Bleu', value: '#007bff' },
@@ -461,6 +527,39 @@ async function handleUpdateProfile() {
     showAlert('Erreur lors de la mise à jour du profil', 'error')
   } finally {
     isUpdating.value = false
+  }
+}
+
+async function handleChangePassword() {
+  if (!passwordForm.currentPassword || !passwordForm.newPassword) {
+    showAlert('Veuillez remplir tous les champs', 'error')
+    return
+  }
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    showAlert('Les mots de passe ne correspondent pas', 'error')
+    return
+  }
+  if (passwordForm.newPassword.length < 4) {
+    showAlert('Le nouveau mot de passe doit contenir au moins 4 caractères', 'error')
+    return
+  }
+  
+  isChangingPassword.value = true
+  try {
+    await api.put('/users/change-password', {
+      currentPassword: passwordForm.currentPassword,
+      newPassword: passwordForm.newPassword
+    })
+    showAlert('Mot de passe modifié avec succès', 'success')
+    passwordForm.currentPassword = ''
+    passwordForm.newPassword = ''
+    passwordForm.confirmPassword = ''
+  } catch (error: any) {
+    console.error('Erreur changement mot de passe:', error)
+    const msg = error.response?.data?.message || 'Erreur lors du changement de mot de passe'
+    showAlert(msg, 'error')
+  } finally {
+    isChangingPassword.value = false
   }
 }
 

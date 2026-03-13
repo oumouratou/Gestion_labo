@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
-import org.springframework.web.bind.annotation.*;
 import java.util.Optional;
 
 @Service
@@ -30,9 +29,10 @@ public class UserService {
         u.setPassword(dto.getPassword());
         u.setCin(dto.getCin());
         u.setRole(Role.ETUDIANT);
+        u.setActive(true);
         u.setDepartement(
             departementRepository.findById(dto.getDepartementId())
-                .orElseThrow(() -> new RuntimeException("Département introuvable"))
+                .orElseThrow(() -> new RuntimeException("Departement introuvable"))
         );
         return userRepository.save(u);
     }
@@ -45,14 +45,14 @@ public class UserService {
         u.setPassword(dto.getPassword());
         u.setCin(dto.getCin());
         u.setRole(Role.ENSEIGNANT);
+        u.setActive(true);
         u.setDepartement(
             departementRepository.findById(dto.getDepartementId())
-                .orElseThrow(() -> new RuntimeException("Département introuvable"))
+                .orElseThrow(() -> new RuntimeException("Departement introuvable"))
         );
         u.setCreatedAt(LocalDateTime.now());
         return userRepository.save(u);
     }
-
 
     public User createTechnicien(TechnicienCreateRequest dto) {
         User u = new User();
@@ -62,6 +62,7 @@ public class UserService {
         u.setPassword(dto.getPassword());
         u.setCin(dto.getCin());
         u.setRole(Role.TECHNICIEN);
+        u.setActive(true);
         u.setLaboratoire(
             laboratoireRepository.findById(dto.getLaboratoireId())
                 .orElseThrow(() -> new RuntimeException("Laboratoire introuvable"))
@@ -79,6 +80,10 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
     }
 
+    public List<User> findByRole(Role role) {
+        return userRepository.findByRole(role);
+    }
+
     // --------- UPDATE ---------
     public User updateEtudiant(Long id, EtudiantUpdateRequest dto) {
         User u = findById(id);
@@ -92,42 +97,47 @@ public class UserService {
         u.setRole(Role.ETUDIANT);
         u.setDepartement(
             departementRepository.findById(dto.getDepartementId())
-                .orElseThrow(() -> new RuntimeException("Département introuvable"))
+                .orElseThrow(() -> new RuntimeException("Departement introuvable"))
         );
+        return userRepository.save(u);
+    }
+
+    public User updateEnseignant(Long id, EnseignantUpdateRequest dto) {
+        Optional<User> optionalUser = userRepository.findById(id);
+        if (optionalUser.isEmpty()) {
+            throw new RuntimeException("Enseignant non trouve avec l'id : " + id);
+        }
+        User enseignant = optionalUser.get();
+        enseignant.setNom(dto.getNom());
+        enseignant.setPrenom(dto.getPrenom());
+        enseignant.setEmail(dto.getEmail());
+        enseignant.setCin(dto.getCin());
+        if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
+            enseignant.setPassword(dto.getPassword());
+        }
+        if (dto.getDepartementId() != null) {
+            Departement dep = departementRepository.findById(dto.getDepartementId())
+                    .orElseThrow(() -> new RuntimeException("Departement non trouve avec l'id : " + dto.getDepartementId()));
+            enseignant.setDepartement(dep);
+        }
+        return userRepository.save(enseignant);
+    }
+
+    // --------- BLOCK / UNBLOCK ---------
+    public User blockUser(Long id) {
+        User u = findById(id);
+        u.setActive(false);
+        return userRepository.save(u);
+    }
+
+    public User unblockUser(Long id) {
+        User u = findById(id);
+        u.setActive(true);
         return userRepository.save(u);
     }
 
     // --------- DELETE ---------
     public void delete(Long id) {
         userRepository.deleteById(id);
-    }
-    public User updateEnseignant(Long id, EnseignantUpdateRequest dto) {
-        Optional<User> optionalUser = userRepository.findById(id);
-        if (optionalUser.isEmpty()) {
-            throw new RuntimeException("Enseignant non trouvé avec l'id : " + id);
-        }
-
-        User enseignant = optionalUser.get();
-
-        // On met à jour les champs
-        enseignant.setNom(dto.getNom());
-        enseignant.setPrenom(dto.getPrenom());
-        enseignant.setEmail(dto.getEmail());
-        enseignant.setCin(dto.getCin());
-
-        // Si un mot de passe est fourni, on le met à jour
-        if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
-            enseignant.setPassword(dto.getPassword());
-        }
-
-        // Mettre à jour le département
-        if (dto.getDepartementId() != null) {
-            Departement dep = departementRepository.findById(dto.getDepartementId())
-                .orElseThrow(() -> new RuntimeException("Département non trouvé avec l'id : " + dto.getDepartementId()));
-            enseignant.setDepartement(dep);
-        }
-
-        // On sauvegarde les modifications
-        return userRepository.save(enseignant);
     }
 }

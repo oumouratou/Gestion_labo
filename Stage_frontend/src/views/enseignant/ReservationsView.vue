@@ -95,7 +95,7 @@
             <table class="table table-hover" style="min-width: 1200px;">
               <thead class="thead-light">
                 <tr>
-                  <th style="width: 50px;">ID</th>
+                  <th style="width: 50px;">N°</th>
                   <th style="width: 120px;">Demandeur</th>
                   <th style="width: 80px;">CIN</th>
                   <th style="width: 70px;">Rôle</th>
@@ -110,12 +110,12 @@
 
               <tbody>
                 <tr 
-                  v-for="reservation in reservationsFiltrees" 
+                  v-for="(reservation, index) in reservationsFiltrees" 
                   :key="reservation.id"
                   :class="{ 'highlight-row': highlightedId === reservation.id }"
                   :ref="el => { if (highlightedId === reservation.id) highlightedRow = el }"
                 >
-                  <td><strong>{{ reservation.id }}</strong></td>
+                  <td><strong>{{ index + 1 }}</strong></td>
 
                   <!-- Nom + Prénom -->
                   <td>

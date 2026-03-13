@@ -18,27 +18,27 @@
             <table class="table table-bordered table-striped table-hover" v-if="reclamations.length">
               <thead class="bg-info text-white">
                 <tr>
-                  <th>ID</th>
+                  <th>N°</th>
                   <th>Étudiant</th>
                   <th>CIN</th>
                   <th>Laboratoire</th>
                   <th>Équipement</th>
                   <th>Description</th>
-                  <th>Quantité</th>
+                  <th>Identifiant Équipement</th>
                   <th>État</th>
                   <th>Date</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="rec in reclamations" :key="rec.id">
-                  <td>{{ rec.id }}</td>
+                <tr v-for="(rec, index) in reclamations" :key="rec.id">
+                  <td>{{ index + 1 }}</td>
                   <td>{{ rec.prenomAuteur }} {{ rec.nomAuteur }}</td>
                   <td>{{ rec.cinAuteur || rec.cin || 'N/A' }}</td>
                   <td>{{ rec.laboratoireNom || 'N/A' }}</td>
                   <td>{{ rec.equipementNom || 'N/A' }}</td>
                   <td>{{ truncateText(rec.description, 40) }}</td>
-                  <td>{{ rec.quantite }}</td>
+                  <td><code class="text-primary">{{ getEquipementIdentifiant(rec) }}</code></td>
                   <td>
                     <span :class="getEtatBadge(rec.etat)">
                       {{ formatEtat(rec.etat) }}
@@ -49,14 +49,14 @@
                     <button
                       class="btn btn-success btn-sm"
                       @click="traiterReclamation(rec.id)"
-                      v-if="rec.etat === 'NON_TRAITEE'"
+                      :disabled="rec.etat !== 'NON_TRAITEE'"
                     >
                       <i class="fas fa-check mr-1"></i> Traiter
                     </button>
                     <button
                       class="btn btn-danger btn-sm"
                       @click="annulerReclamation(rec.id)"
-                      v-if="rec.etat === 'NON_TRAITEE'"
+                      :disabled="rec.etat !== 'NON_TRAITEE'"
                     >
                       <i class="fas fa-times mr-1"></i> Annuler
                     </button>
@@ -83,6 +83,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import ReclamationService from '@/Service/ReclamationService'
+import { getEquipements } from '@/Service/EquipementService'
 
 interface Reclamation {
   id: number
@@ -90,6 +91,9 @@ interface Reclamation {
   quantite: number
   etat: string
   dateReclamation: string
+  equipementId?: number
+  equipementIdentifiant?: string
+  identifiantEquipement?: string
   laboratoireNom?: string
   equipementNom?: string
   nomAuteur?: string
@@ -99,10 +103,20 @@ interface Reclamation {
 }
 
 const reclamations = ref<Reclamation[]>([])
+const allEquipements = ref<any[]>([])
 
 // Charger les reclamations des etudiants du departement du technicien
 async function fetchReclamations() {
   try {
+    // Charger les équipements pour résoudre les identifiants
+    if (allEquipements.value.length === 0) {
+      try {
+        const eqRes = await getEquipements()
+        allEquipements.value = Array.isArray(eqRes.data) ? eqRes.data : []
+      } catch (e) {
+        console.warn('Impossible de charger les équipements:', e)
+      }
+    }
     const res = await ReclamationService.getReclamationsPourTechnicien()
     const data = Array.isArray(res.data) ? res.data : []
     // Filtrer uniquement les reclamations des etudiants
@@ -113,13 +127,52 @@ async function fetchReclamations() {
   }
 }
 
-// 🔹 Traiter une réclamation (Approuver)
+function getEquipementIdentifiant(rec: any): string {
+  if (rec.equipementIdentifiant) return rec.equipementIdentifiant
+  if (rec.identifiantEquipement) return rec.identifiantEquipement
+  if (rec.equipement?.identifiant) return rec.equipement.identifiant
+  const equipId = rec.equipementId || rec.equipement?.id
+  if (equipId && allEquipements.value.length > 0) {
+    const equip = allEquipements.value.find((e: any) => e.id === equipId)
+    if (equip?.identifiant) return equip.identifiant
+  }
+  if (equipId) return `EQ-${String(equipId).padStart(4, '0')}`
+  return 'N/A'
+}
+
+// 🔹 Traiter une réclamation (Approuver) + auto-traiter les doublons
 async function traiterReclamation(id: number) {
   try {
     console.log(`Traitement réclamation #${id}...`);
     const response = await ReclamationService.traiterReclamation(id);
     console.log("Réponse traitement:", response.data);
-    alert("✅ Réclamation approuvée avec succès ! Une notification a été envoyée à l'étudiant.");
+
+    // Auto-traiter les réclamations similaires (même labo + même équipement)
+    const traitee = reclamations.value.find(r => r.id === id);
+    if (traitee) {
+      const doublons = reclamations.value.filter(
+        r => r.id !== id 
+          && r.etat === 'NON_TRAITEE' 
+          && r.laboratoireNom === traitee.laboratoireNom 
+          && r.equipementNom === traitee.equipementNom
+      );
+      for (const d of doublons) {
+        try {
+          await ReclamationService.traiterReclamation(d.id);
+          console.log(`Auto-traitement réclamation doublon #${d.id}`);
+        } catch (e) {
+          console.error(`Erreur auto-traitement #${d.id}:`, e);
+        }
+      }
+      if (doublons.length > 0) {
+        alert(`✅ Réclamation approuvée + ${doublons.length} réclamation(s) similaire(s) auto-traitée(s) !`);
+      } else {
+        alert("✅ Réclamation approuvée avec succès ! Une notification a été envoyée à l'étudiant.");
+      }
+    } else {
+      alert("✅ Réclamation approuvée avec succès ! Une notification a été envoyée à l'étudiant.");
+    }
+
     await fetchReclamations();
   } catch (error: any) {
     console.error('Erreur traitement:', error);
@@ -198,4 +251,13 @@ onMounted(fetchReclamations)
 .badge { padding: 5px 10px; border-radius: 4px; font-size: 12px; text-transform: uppercase; }
 .d-flex.gap-1 button { margin-right: 4px; }
 .card-footer { font-size: 14px; color: #64748b; padding: 12px 20px; }
+
+@media (max-width: 768px) {
+  .page-container { padding: 8px; }
+  .card { border-radius: 8px; }
+  .card-header { font-size: 15px; padding: 12px; }
+  .table th, .table td { font-size: 12px; padding: 6px 4px; }
+  .btn-sm { font-size: 11px; padding: 3px 6px; }
+  .d-flex.gap-1 { flex-direction: column; gap: 4px !important; }
+}
 </style>

@@ -90,6 +90,7 @@
                 </div>
 
                 <p><strong>Description:</strong> {{ equip.caracteristique || 'N/A' }}</p>
+                <p><strong>Identifiant:</strong> <code class="text-primary">{{ equip.identifiant || 'N/A' }}</code></p>
                 <p><strong>Laboratoire:</strong> {{ getLaboNom(equip.laboratoire?.id || equip.laboratoireId) }}</p>
                 <p><strong>Date acquisition:</strong> {{ equip.dateAcquisition || 'N/A' }}</p>
               </div>
@@ -135,6 +136,9 @@
               <dt class="col-sm-4">Nom:</dt>
               <dd class="col-sm-8">{{ selectedEquip.nom }}</dd>
 
+              <dt class="col-sm-4">Identifiant:</dt>
+              <dd class="col-sm-8"><code class="text-primary">{{ selectedEquip.identifiant || 'N/A' }}</code></dd>
+
               <dt class="col-sm-4">Description:</dt>
               <dd class="col-sm-8">{{ selectedEquip.caracteristique || 'N/A' }}</dd>
 
@@ -173,7 +177,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getLaboratoires } from '@/Service/LaboratoireService'
 import { getEquipementsByLabo } from '@/Service/EquipementService'
-import { getDepartements } from '@/Service/departementService'
+import { getActiveDepartements } from '@/Service/departementService'
 import type { Equipement, Laboratoire, Departement } from '@/types'
 
 const router = useRouter()
@@ -190,7 +194,7 @@ const loading = ref(false)
 onMounted(async () => {
   try {
     // Charger tous les départements
-    const resDepts = await getDepartements()
+    const resDepts = await getActiveDepartements()
     departements.value = Array.isArray(resDepts.data) ? resDepts.data : []
 
     // Charger tous les laboratoires
@@ -251,7 +255,14 @@ async function loadEquipementsForDepartement() {
     try {
       const res = await getEquipementsByLabo(labo.id)
       if (Array.isArray(res.data)) {
-        equipements.value.push(...res.data)
+        const normalized = res.data.map((e: any) => {
+          let imgUrl = e.imageUrl || e.image_url || e.imageURL || e.img || null
+          if (imgUrl && !imgUrl.startsWith('http')) {
+            imgUrl = 'http://localhost:8085' + (imgUrl.startsWith('/') ? '' : '/') + imgUrl
+          }
+          return { ...e, imageUrl: imgUrl }
+        })
+        equipements.value.push(...normalized)
       }
     } catch (e) {
       console.warn(`Erreur chargement équipements labo ${labo.id}`, e)

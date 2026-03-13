@@ -131,11 +131,21 @@
           "role": "assistant",
           "content": "Vous avez 3 laboratoires disponibles dans votre département. Cliquez ici pour les voir : /etudiant/laboratoires",
           "timestamp": "2026-02-18T15:55:38.038043"
+        },
+        {
+          "role": "user",
+          "content": "salut",
+          "timestamp": "2026-03-05T09:01:39.844800"
+        },
+        {
+          "role": "assistant",
+          "content": "Salut ! Comment allez-vous aujourd'hui ? Avez-vous besoin d'aide ou de conseil sur quelque chose ? Je suis là pour vous aider !",
+          "timestamp": "2026-03-05T09:02:26.728792"
         }
       ],
       "liked": false,
       "created_at": "2026-02-18T15:53:22.062248",
-      "updated_at": "2026-02-18T15:55:38.038043"
+      "updated_at": "2026-03-05T09:02:26.728792"
     }
   },
   "18": {

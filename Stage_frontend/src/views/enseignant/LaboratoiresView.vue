@@ -72,16 +72,20 @@
                     </button>
                   </td>
                   <td class="text-center">
-                    <button 
-                      class="btn btn-sm" 
-                      :class="canReclamer(labo) ? 'btn-warning' : 'btn-secondary'"
-                      @click="goToReclamation(labo)"
-                      :disabled="!canReclamer(labo)"
-                      :title="getReclamationTooltip(labo)"
-                    >
-                      <i class="fas fa-exclamation-triangle mr-1"></i> 
-                      {{ canReclamer(labo) ? 'Réclamer' : 'Labo inactif' }}
-                    </button>
+                    <template v-if="canReclamer(labo)">
+                      <button 
+                        class="btn btn-sm btn-warning"
+                        @click="goToReclamation(labo)"
+                        title="Réclamer sur ce laboratoire"
+                      >
+                        <i class="fas fa-exclamation-triangle mr-1"></i> Réclamer
+                      </button>
+                    </template>
+                    <template v-else>
+                      <button class="btn btn-sm btn-secondary" disabled>
+                        <i class="fas fa-lock mr-1"></i> Labo inactif
+                      </button>
+                    </template>
                   </td>
                 </tr>
 
@@ -160,7 +164,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { getLaboratoires } from '@/Service/LaboratoireService'
-import { getDepartements } from '@/Service/departementService'
+import { getActiveDepartements } from '@/Service/departementService'
 
 const router = useRouter()
 const laboratoires = ref<any[]>([])
@@ -174,7 +178,7 @@ onMounted(async () => {
     const labosRes = await getLaboratoires()
     laboratoires.value = Array.isArray(labosRes.data) ? labosRes.data : []
 
-    const depsRes = await getDepartements()
+    const depsRes = await getActiveDepartements()
     departements.value = Array.isArray(depsRes.data) ? depsRes.data : []
 
   } catch (error) {

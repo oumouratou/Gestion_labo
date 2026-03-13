@@ -15,27 +15,65 @@
     <section class="content">
       <div class="container-fluid">
 
-        <!-- Filtre par laboratoire -->
-        <div class="card card-outline card-info mb-3" v-if="laboratoires.length > 0">
+        <!-- Filtres par département et laboratoire -->
+        <div class="card card-outline card-info mb-3">
           <div class="card-header">
-            <h3 class="card-title">Filtrer par laboratoire</h3>
+            <h3 class="card-title"><i class="fas fa-filter mr-2"></i>Filtres</h3>
           </div>
           <div class="card-body">
             <div class="row">
-              <div class="col-md-6">
-                <select class="form-control" v-model="selectedLaboratoire">
-                  <option value="">Tous les laboratoires</option>
-                  <option v-for="labo in laboratoires" :key="labo.id" :value="labo.id">
-                    {{ labo.nomLabo }}
-                  </option>
-                </select>
+              <!-- Filtre Département -->
+              <div class="col-md-4">
+                <div class="form-group">
+                  <label>Département</label>
+                  <select class="form-control" v-model="selectedDepartement" @change="onDepartementChange">
+                    <option value="">-- Sélectionner un département --</option>
+                    <option v-for="dept in departements" :key="dept.id" :value="dept.id">
+                      {{ dept.nom }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Filtre Laboratoire -->
+              <div class="col-md-4">
+                <div class="form-group">
+                  <label>Laboratoire</label>
+                  <select class="form-control" v-model="selectedLaboratoire" :disabled="!selectedDepartement">
+                    <option value="">-- Tous les laboratoires --</option>
+                    <option v-for="labo in filteredLaboratoires" :key="labo.id" :value="labo.id">
+                      {{ labo.nomLabo || labo.nom }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Info -->
+              <div class="col-md-4 d-flex align-items-end">
+                <div class="form-group w-100">
+                  <span class="badge badge-info p-2">
+                    <i class="fas fa-cog mr-1"></i> {{ filteredEquipements.length }} équipement(s) trouvé(s)
+                  </span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
+        <!-- Message si aucun département sélectionné -->
+        <div v-if="!selectedDepartement" class="alert alert-info">
+          <i class="fas fa-info-circle mr-2"></i>
+          Veuillez sélectionner un département pour afficher les laboratoires et équipements.
+        </div>
+
+        <!-- Loading -->
+        <div v-else-if="loading" class="text-center p-5">
+          <i class="fas fa-spinner fa-spin fa-2x"></i>
+          <p class="mt-2">Chargement des équipements...</p>
+        </div>
+
         <!-- Liste des équipements -->
-        <div class="row">
+        <div class="row" v-else>
           <div class="col-md-4 mb-3" v-for="equip in filteredEquipements" :key="equip.id">
             <div class="card" :class="getCardClass(equip.etat)">
               <div class="card-header">
@@ -139,46 +177,32 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMesLabos } from '@/Service/LaboratoireService'
+import { getLaboratoires } from '@/Service/LaboratoireService'
 import { getEquipementsByLabo } from '@/Service/EquipementService'
+import { getActiveDepartements } from '@/Service/departementService'
 import ReclamationService from '@/Service/ReclamationService'
-import type { Equipement, Laboratoire } from '@/types'
+import type { Equipement, Laboratoire, Departement } from '@/types'
 
 const router = useRouter()
 const equipements = ref<Equipement[]>([])
 const laboratoires = ref<Laboratoire[]>([])
+const departements = ref<Departement[]>([])
 const reclamationsEnCours = ref<any[]>([])
+const selectedDepartement = ref<number | ''>('')
 const selectedLaboratoire = ref<number | ''>('')
 const showDetailsModal = ref(false)
 const selectedEquip = ref<Equipement | null>(null)
+const loading = ref(false)
 
 onMounted(async () => {
   try {
-    // Charger les laboratoires du departement de l'etudiant
-    const resLabos = await getMesLabos()
-    laboratoires.value = Array.isArray(resLabos.data) ? resLabos.data : []
+    // Charger tous les départements
+    const resDepts = await getActiveDepartements()
+    departements.value = Array.isArray(resDepts.data) ? resDepts.data : []
 
-    // Charger les equipements de chaque labo
-    const allEquipements: Equipement[] = []
-    for (const labo of laboratoires.value) {
-      try {
-        const resEquip = await getEquipementsByLabo(labo.id)
-        console.log(`Équipements labo ${labo.id}:`, resEquip.data) // Debug
-        if (Array.isArray(resEquip.data)) {
-          // Normaliser les données (gérer les différents formats possibles)
-          const normalized = resEquip.data.map((e: any) => ({
-            ...e,
-            // Gérer les différents noms possibles pour l'URL de l'image
-            imageUrl: e.imageUrl || e.image_url || e.imageURL || e.img || null
-          }))
-          allEquipements.push(...normalized)
-        }
-      } catch (e) {
-        console.warn(`Erreur chargement equipements labo ${labo.id}`, e)
-      }
-    }
-    equipements.value = allEquipements
-    console.log('Tous les équipements chargés:', equipements.value) // Debug
+    // Charger tous les laboratoires
+    const resLabos = await getLaboratoires()
+    laboratoires.value = Array.isArray(resLabos.data) ? resLabos.data : []
 
     // Charger les réclamations en cours de l'étudiant
     try {
@@ -190,20 +214,72 @@ onMounted(async () => {
       console.warn('Erreur chargement réclamations:', e)
       reclamationsEnCours.value = []
     }
-
-    console.log('Labos filtres:', laboratoires.value)
-    console.log('Equipements filtres:', equipements.value)
-    console.log('Réclamations en cours:', reclamationsEnCours.value)
   } catch (err) {
     console.error(err)
-    alert('Impossible de charger les equipements de votre departement.')
+    alert('Impossible de charger les données.')
   }
 })
 
-const filteredEquipements = computed(() => {
-  if (!selectedLaboratoire.value) return equipements.value
-  return equipements.value.filter(e => e.laboratoire?.id === selectedLaboratoire.value)
+// Laboratoires filtrés par département sélectionné
+const filteredLaboratoires = computed(() => {
+  if (!selectedDepartement.value) return []
+  return laboratoires.value.filter(labo => 
+    labo.departement?.id === selectedDepartement.value || 
+    (labo as any).departementId === selectedDepartement.value
+  )
 })
+
+// Équipements filtrés par laboratoire sélectionné (ou tous les labos du département)
+const filteredEquipements = computed(() => {
+  if (!selectedDepartement.value) return []
+  
+  if (selectedLaboratoire.value) {
+    return equipements.value.filter(e => 
+      (e.laboratoire?.id === selectedLaboratoire.value) || 
+      ((e as any).laboratoireId === selectedLaboratoire.value)
+    )
+  }
+  
+  return equipements.value
+})
+
+// Quand le département change
+async function onDepartementChange() {
+  selectedLaboratoire.value = ''
+  equipements.value = []
+  
+  if (!selectedDepartement.value) return
+  
+  await loadEquipementsForDepartement()
+}
+
+// Charger tous les équipements des labos du département
+async function loadEquipementsForDepartement() {
+  loading.value = true
+  equipements.value = []
+  
+  const labosOfDept = filteredLaboratoires.value
+  
+  for (const labo of labosOfDept) {
+    try {
+      const resEquip = await getEquipementsByLabo(labo.id)
+      if (Array.isArray(resEquip.data)) {
+        const normalized = resEquip.data.map((e: any) => {
+          let imgUrl = e.imageUrl || e.image_url || e.imageURL || e.img || null
+          if (imgUrl && !imgUrl.startsWith('http')) {
+            imgUrl = 'http://localhost:8085' + (imgUrl.startsWith('/') ? '' : '/') + imgUrl
+          }
+          return { ...e, imageUrl: imgUrl }
+        })
+        equipements.value.push(...normalized)
+      }
+    } catch (e) {
+      console.warn(`Erreur chargement equipements labo ${labo.id}`, e)
+    }
+  }
+  
+  loading.value = false
+}
 
 function getLaboNom(id?: number) {
   if (!id) return 'N/A'

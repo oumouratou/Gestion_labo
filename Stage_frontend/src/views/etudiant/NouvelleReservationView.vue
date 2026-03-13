@@ -26,20 +26,31 @@
 
               <form @submit.prevent="handleSubmit">
                 <div class="card-body">
-                  <!-- Laboratoire (seuls les labos ACTIFS sont affichés) -->
+                  <!-- Département -->
+                  <div class="form-group">
+                    <label>Département *</label>
+                    <select class="form-control" v-model="selectedDeptId" @change="onDepartementChange" required>
+                      <option value="">Sélectionner un département</option>
+                      <option v-for="dept in departements" :key="dept.id" :value="dept.id">
+                        {{ dept.nom }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <!-- Laboratoire (filtré par département, ACTIFS uniquement) -->
                   <div class="form-group">
                     <label>Laboratoire *</label>
-                    <select class="form-control" v-model="form.laboratoireId" required>
-                      <option value="">Sélectionner un laboratoire</option>
+                    <select class="form-control" v-model="form.laboratoireId" :disabled="!selectedDeptId" required>
+                      <option value="">{{ !selectedDeptId ? 'Sélectionnez d\'abord un département' : 'Sélectionner un laboratoire' }}</option>
                       <option
-                        v-for="labo in laboratoiresActifs"
+                        v-for="labo in filteredLaboratoires"
                         :key="labo.id"
                         :value="labo.id"
                       >
                         {{ labo.nomLabo }}
                       </option>
                     </select>
-                    <small class="text-muted" v-if="laboratoiresInactifs > 0">
+                    <small class="text-muted" v-if="selectedDeptId && laboratoiresInactifs > 0">
                       <i class="fas fa-info-circle mr-1"></i>
                       {{ laboratoiresInactifs }} laboratoire(s) inactif(s) masqué(s)
                     </small>
@@ -93,6 +104,8 @@
 import { reactive, ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import api from '@/Service/api'
+import { getActiveDepartements } from '@/Service/departementService'
+import { getLaboratoires } from '@/Service/LaboratoireService'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -101,17 +114,33 @@ const authStore = useAuthStore()
 const minDate = new Date().toISOString().split('T')[0]
 
 const currentUser = computed(() => authStore.currentUser)
+const departements = ref<any[]>([])
 const laboratoires = ref<any[]>([])
+const selectedDeptId = ref<number | ''>('')
 
-// Filtrer les laboratoires ACTIFS uniquement
-const laboratoiresActifs = computed(() => 
-  laboratoires.value.filter(labo => labo.etatLabo === 'ACTIF')
-)
+// Laboratoires filtrés par département sélectionné (ACTIFS uniquement)
+const filteredLaboratoires = computed(() => {
+  if (!selectedDeptId.value) return []
+  return laboratoires.value.filter(labo => {
+    const matchDept = labo.departementId === selectedDeptId.value || labo.departement?.id === selectedDeptId.value
+    const isActif = labo.etatLabo === 'ACTIF'
+    return matchDept && isActif
+  })
+})
 
-// Compter les labos inactifs masqués
-const laboratoiresInactifs = computed(() => 
-  laboratoires.value.filter(labo => labo.etatLabo !== 'ACTIF').length
-)
+// Compter les labos inactifs masqués dans le département sélectionné
+const laboratoiresInactifs = computed(() => {
+  if (!selectedDeptId.value) return 0
+  return laboratoires.value.filter(labo => {
+    const matchDept = labo.departementId === selectedDeptId.value || labo.departement?.id === selectedDeptId.value
+    const isInactif = labo.etatLabo !== 'ACTIF'
+    return matchDept && isInactif
+  }).length
+})
+
+function onDepartementChange() {
+  form.laboratoireId = ''
+}
 
 const form = reactive({
   laboratoireId: '' as string | '',
@@ -129,16 +158,19 @@ onMounted(async () => {
       return
     }
 
-    const res = await api.get('/laboratoires/mes-labos')
-    laboratoires.value = res.data
-    console.log('Labos du département:', laboratoires.value)
+    const [deptRes, laboRes] = await Promise.all([getActiveDepartements(), getLaboratoires()])
+    departements.value = Array.isArray(deptRes.data) ? deptRes.data : []
+    laboratoires.value = Array.isArray(laboRes.data) ? laboRes.data : []
+    console.log('Départements:', departements.value)
+    console.log('Laboratoires:', laboratoires.value)
     
     // Pré-sélectionner le labo si passé en paramètre
     if (route.query.laboratoireId) {
       const laboId = route.query.laboratoireId.toString()
-      // Vérifier que le labo est actif avant de le sélectionner
-      const labo = laboratoiresActifs.value.find(l => l.id.toString() === laboId)
+      const labo = laboratoires.value.find(l => l.id.toString() === laboId && l.etatLabo === 'ACTIF')
       if (labo) {
+        const deptId = labo.departementId || labo.departement?.id
+        if (deptId) selectedDeptId.value = deptId
         form.laboratoireId = laboId
       }
     }

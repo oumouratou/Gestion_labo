@@ -61,7 +61,7 @@
                   </td>
                   <td>{{ getDemandeurCin(notif) }}</td>
                   <td>{{ notif.laboName || notif.laboratoireNom || '—' }}</td>
-                  <td>{{ truncateText(notif.message, 50) }}</td>
+                  <td>{{ cleanMessage(truncateText(notif.message, 50)) }}</td>
                   <td>{{ formatDate(notif.createdAt) }}</td>
                   <td>
                     <span :class="notif.read ? 'badge badge-secondary' : 'badge badge-primary'">
@@ -70,11 +70,10 @@
                   </td>
                   <td>
                     <button 
-                      class="btn btn-success btn-sm mr-1"
+                      class="btn btn-info btn-sm mr-1"
                       @click="openNotification(notif)"
-                      :disabled="notif.read"
                     >
-                      <i class="fas fa-eye mr-1"></i> {{ notif.read ? 'Vu' : 'Voir' }}
+                      <i class="fas fa-eye mr-1"></i> Voir
                     </button>
                   </td>
                 </tr>
@@ -91,6 +90,62 @@
         </div>
       </div>
     </section>
+
+    <!-- Modal Détails Notification -->
+    <div class="modal fade" :class="{ show: showDetailModal }" :style="{ display: showDetailModal ? 'block' : 'none' }">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header" :class="selectedNotif?.type === 'RESERVATION' ? 'bg-success text-white' : 'bg-warning'">
+            <h5 class="modal-title">
+              <i :class="selectedNotif?.type === 'RESERVATION' ? 'fas fa-calendar-check' : 'fas fa-exclamation-triangle'" class="mr-2"></i>
+              Détails - {{ selectedNotif?.type === 'RESERVATION' ? 'Réservation' : 'Réclamation' }}
+            </h5>
+            <button type="button" class="close" @click="showDetailModal = false">&times;</button>
+          </div>
+          <div class="modal-body" v-if="selectedNotif">
+            <dl class="row mb-0">
+              <dt class="col-sm-4">Type :</dt>
+              <dd class="col-sm-8">
+                <span :class="typeBadge(selectedNotif.type)">
+                  {{ selectedNotif.type === 'RESERVATION' ? 'Réservation' : 'Réclamation' }}
+                </span>
+              </dd>
+
+              <dt class="col-sm-4">Demandeur :</dt>
+              <dd class="col-sm-8">{{ getDemandeurNom(selectedNotif) }}</dd>
+
+              <dt class="col-sm-4">CIN :</dt>
+              <dd class="col-sm-8">{{ getDemandeurCin(selectedNotif) }}</dd>
+
+              <dt class="col-sm-4" v-if="selectedNotif.laboratoireNom || selectedNotif.laboName">Laboratoire :</dt>
+              <dd class="col-sm-8" v-if="selectedNotif.laboratoireNom || selectedNotif.laboName">{{ selectedNotif.laboratoireNom || selectedNotif.laboName }}</dd>
+
+              <dt class="col-sm-4">Message :</dt>
+              <dd class="col-sm-8">{{ selectedNotif.message }}</dd>
+
+              <dt class="col-sm-4" v-if="selectedNotif.motifRefus">Motif de refus :</dt>
+              <dd class="col-sm-8 text-danger" v-if="selectedNotif.motifRefus">
+                <i class="fas fa-times-circle mr-1"></i> {{ selectedNotif.motifRefus }}
+              </dd>
+
+              <dt class="col-sm-4">Date :</dt>
+              <dd class="col-sm-8">{{ formatDate(selectedNotif.createdAt) }}</dd>
+
+              <dt class="col-sm-4">Statut :</dt>
+              <dd class="col-sm-8">
+                <span :class="selectedNotif.read ? 'badge badge-secondary' : 'badge badge-primary'">
+                  {{ selectedNotif.read ? 'Lu' : 'Non lu' }}
+                </span>
+              </dd>
+            </dl>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="showDetailModal = false">Fermer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" v-if="showDetailModal"></div>
   </div>
 </template>
 
@@ -132,6 +187,8 @@ interface NotificationDTO {
 const router = useRouter()
 const notifications = ref<NotificationDTO[]>([])
 const activeFilter = ref<'all' | 'RESERVATION' | 'RECLAMATION'>('all')
+const showDetailModal = ref(false)
+const selectedNotif = ref<NotificationDTO | null>(null)
 
 const filteredNotifications = computed(() => {
   if (activeFilter.value === 'all') return notifications.value
@@ -169,6 +226,16 @@ function getDemandeurCin(notif: NotificationDTO): string {
 function truncateText(text: string, maxLength: number): string {
   if (!text) return ''
   return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
+}
+
+function cleanMessage(message: string) {
+  if (!message) return ''
+  return message
+    .replace(/#\d+/g, '')
+    .replace(/\b(id|ID)\s*[:=]?\s*\d+/gi, '')
+    .replace(/\(\s*\)/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
 }
 
 async function fetchNotifications() {
@@ -211,10 +278,8 @@ async function openNotification(notif: NotificationDTO) {
     notif.read = true
   }
 
-  // Redirection vers les réclamations
-  if (notif.type === 'RECLAMATION') {
-    router.push('/technicien/reclamations')
-  }
+  selectedNotif.value = notif
+  showDetailModal.value = true
 }
 
 function typeBadge(type: string) {
@@ -252,4 +317,6 @@ onMounted(fetchNotifications)
   flex-wrap: wrap;
   gap: 8px;
 }
+
+.modal.show { display: block; background: rgba(0,0,0,0.5); }
 </style>

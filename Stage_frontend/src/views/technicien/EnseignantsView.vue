@@ -48,7 +48,7 @@
           <table class="table table-bordered table-hover">
             <thead class="bg-info">
               <tr>
-                <th>ID</th>
+                <th>N°</th>
                 <th>Nom</th>
                 <th>Prénom</th>
                 <th>Email</th>
@@ -59,8 +59,8 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="ens in filteredEnseignants" :key="ens.id">
-                <td>{{ ens.id }}</td>
+              <tr v-for="(ens, index) in filteredEnseignants" :key="ens.id">
+                <td>{{ index + 1 }}</td>
                 <td>{{ ens.nom }}</td>
                 <td>{{ ens.prenom }}</td>
                 <td>{{ ens.email }}</td>
@@ -69,11 +69,11 @@
                 <td>{{ formatDate(ens.createdAt) }}</td>
                 <td class="text-center">
                   <div class="d-flex justify-content-center gap-2">
-                    <button class="btn btn-primary btn-sm" @click="openModal(ens)">
-                      <i class="fas fa-edit mr-1"></i>Modifier
-                    </button>
-                    <button class="btn btn-danger btn-sm ml-1" @click="handleDelete(ens.id)">
-                      <i class="fas fa-trash mr-1"></i>Supprimer
+                    <button 
+                      class="btn btn-info btn-sm" 
+                      @click="openAlertModal(ens)"
+                    >
+                      <i class="fas fa-bell mr-1"></i>Alerter
                     </button>
                   </div>
                 </td>
@@ -141,6 +141,46 @@
     </div>
 
     <div class="modal-backdrop fade show" v-if="showModal"></div>
+
+    <!-- Modal Alerter -->
+    <div class="modal fade" :class="{ show: showAlertModal }" :style="{ display: showAlertModal ? 'block' : 'none' }">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-info text-white">
+            <h4 class="modal-title"><i class="fas fa-bell mr-2"></i>Alerter l'enseignant</h4>
+            <button type="button" class="close text-white" @click="closeAlertModal">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="alert alert-info">
+              <i class="fas fa-user mr-2"></i>
+              Envoyer une alerte à <strong>{{ alertTarget?.prenom }} {{ alertTarget?.nom }}</strong>
+            </div>
+            <div class="form-group">
+              <label><strong>Message de l'alerte <span class="text-danger">*</span></strong></label>
+              <textarea 
+                class="form-control" 
+                v-model="alertMessage" 
+                rows="4" 
+                placeholder="Saisissez le message de l'alerte..."
+                required
+              ></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeAlertModal">Annuler</button>
+            <button 
+              type="button" 
+              class="btn btn-info" 
+              @click="sendAlert"
+              :disabled="!alertMessage.trim()"
+            >
+              <i class="fas fa-paper-plane mr-1"></i> Envoyer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" v-if="showAlertModal"></div>
   </div>
 </template>
 
@@ -148,14 +188,34 @@
 import { ref, reactive, onMounted, computed } from 'vue';
 import { getUsers, createEnseignant, updateEnseignant, deleteUser } from '@/Service/UserService';
 import { getDepartements } from '@/Service/departementService';
+import { sendAlertToUser } from '@/Service/NotificationService';
 
-const enseignants = ref([]);
-const departements = ref([]);
+interface DepartementOption {
+  id: number;
+  nom: string;
+}
+
+interface EnseignantRow {
+  id: number;
+  nom: string;
+  prenom: string;
+  email: string;
+  cin?: string;
+  role: string;
+  createdAt?: string | null;
+  departement?: { id: number; nom: string };
+}
+
+const enseignants = ref<EnseignantRow[]>([]);
+const departements = ref<DepartementOption[]>([]);
 const showModal = ref(false);
 const isEdit = ref(false);
 const editId = ref<number | null>(null);
 const selectedDepartement = ref<number | ''>('');
 const searchQuery = ref('');
+const showAlertModal = ref(false);
+const alertTarget = ref<any>(null);
+const alertMessage = ref('');
 
 // Filtrer les enseignants par département et recherche
 const filteredEnseignants = computed(() => {
@@ -191,14 +251,15 @@ const form = reactive({
 
 async function loadEnseignants() {
   const res = await getUsers();
-  const data = res.data.filter(u => u.role === 'ENSEIGNANT');
+  const rawData = Array.isArray(res.data) ? res.data : [];
+  const data = rawData.filter((u: EnseignantRow) => u.role === 'ENSEIGNANT');
   // Trier par ID décroissant (les plus récents en premier)
-  enseignants.value = data.sort((a: any, b: any) => b.id - a.id);
+  enseignants.value = data.sort((a: EnseignantRow, b: EnseignantRow) => b.id - a.id);
 }
 
 async function loadDepartements() {
   const res = await getDepartements();
-  departements.value = res.data;
+  departements.value = Array.isArray(res.data) ? res.data : [];
 }
 
 function openModal(ens?: any) {
@@ -257,14 +318,46 @@ async function handleDelete(id: number) {
     console.error('Erreur suppression:', error);
     alert(
       error.response?.data?.message ||
-      'Impossible de supprimer l’enseignant. Vérifie le backend.'
+      'Impossible de supprimer l\'enseignant. Vérifie le backend.'
     );
   }
 }
 
-function formatDate(dateStr: string | null) {
+
+
+function formatDate(dateStr?: string | null) {
   if (!dateStr) return 'N/A';
   return new Date(dateStr).toLocaleString();
+}
+
+function openAlertModal(ens: any) {
+  alertTarget.value = ens;
+  alertMessage.value = '';
+  showAlertModal.value = true;
+}
+
+function closeAlertModal() {
+  showAlertModal.value = false;
+  alertTarget.value = null;
+  alertMessage.value = '';
+}
+
+async function sendAlert() {
+  if (!alertTarget.value || !alertMessage.value.trim()) return;
+  try {
+    await sendAlertToUser(alertTarget.value.id, alertMessage.value);
+    alert('Alerte envoyée avec succès à ' + alertTarget.value.prenom + ' ' + alertTarget.value.nom);
+    closeAlertModal();
+  } catch (error: any) {
+    console.error('Erreur envoi alerte:', error);
+    const apiError = error.response?.data;
+    const errorMessage =
+      apiError?.message ||
+      apiError?.error ||
+      (typeof apiError === 'string' ? apiError : null) ||
+      error.message;
+    alert('Erreur lors de l\'envoi de l\'alerte: ' + errorMessage);
+  }
 }
 
 onMounted(async () => {

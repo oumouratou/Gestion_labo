@@ -116,7 +116,7 @@ import { useRouter, useRoute } from 'vue-router'
 import ReclamationService from '@/Service/ReclamationService'
 import { getLaboratoires } from '@/Service/LaboratoireService'
 import { getEquipementsByLabo } from '@/Service/EquipementService'
-import { getDepartements } from '@/Service/departementService'
+import { getActiveDepartements } from '@/Service/departementService'
 import { useAuthStore } from '@/stores/auth'
 
 // Stores & Router
@@ -186,7 +186,7 @@ const laboratoiresInactifs = computed(() => {
 // Charger les départements
 async function loadDepartements() {
   try {
-    const res = await getDepartements()
+    const res = await getActiveDepartements()
     departements.value = Array.isArray(res.data) ? res.data : []
     console.log("Départements:", departements.value)
   } catch (err) {

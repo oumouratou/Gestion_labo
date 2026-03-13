@@ -22,6 +22,24 @@
     <!-- CONTENT -->
     <section class="content">
       <div class="container-fluid">
+
+        <!-- FILTRE DÉPARTEMENT -->
+        <div class="card mb-3">
+          <div class="card-body">
+            <label><strong>Filtrer par département :</strong></label>
+            <select v-model="selectedDepartement" class="form-control w-25">
+              <option value="">Tous les départements</option>
+              <option
+                v-for="dep in departements"
+                :key="dep.id"
+                :value="dep.nom"
+              >
+                {{ dep.nom }}
+              </option>
+            </select>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-body table-responsive p-0">
             <table class="table table-hover text-nowrap">
@@ -37,7 +55,7 @@
               </thead>
 
               <tbody>
-                <tr v-for="labo in laboratoires" :key="labo.id">
+                <tr v-for="labo in labosFiltres" :key="labo.id">
                   <td>{{ labo.nomLabo }}</td>
                   <td>
                     <span class="badge badge-info">
@@ -65,35 +83,41 @@
                     </small>
                   </td>
                   <td>
-                    <span class="badge badge-secondary">
-                      {{ labo.equipements?.length || 0 }}
-                    </span>
+                    <button 
+                      class="btn btn-sm btn-info"
+                      @click="showEquipementsModal(labo)"
+                      :disabled="!labo.equipements || labo.equipements.length === 0"
+                    >
+                      <i class="fas fa-cogs mr-1"></i>
+                      {{ labo.equipements?.length || 0 }} équipement(s)
+                    </button>
                   </td>
                   <td class="text-center">
-                    <button 
-                      class="btn btn-sm mr-1" 
-                      :class="canReserveLabo(labo) ? 'btn-success' : 'btn-secondary'"
-                      @click="goToReservation(labo)"
-                      :disabled="!canReserveLabo(labo)"
-                      :title="getReserveButtonTooltip(labo)"
-                    >
-                      <i class="fas fa-calendar-plus mr-1"></i> 
-                      {{ canReserveLabo(labo) ? 'Réserver' : 'Non disponible' }}
-                    </button>
-                    <button 
-                      class="btn btn-sm" 
-                      :class="canReclamer(labo) ? 'btn-warning' : 'btn-secondary'"
-                      @click="goToReclamation(labo)"
-                      :disabled="!canReclamer(labo)"
-                      :title="getReclamationTooltip(labo)"
-                    >
-                      <i class="fas fa-exclamation-triangle mr-1"></i> 
-                      {{ canReclamer(labo) ? 'Réclamer' : 'Labo inactif' }}
-                    </button>
+                    <template v-if="canReserveLabo(labo)">
+                      <button 
+                        class="btn btn-sm btn-success mr-1" 
+                        @click="goToReservation(labo)"
+                        title="Réserver ce laboratoire"
+                      >
+                        <i class="fas fa-calendar-plus mr-1"></i> Réserver
+                      </button>
+                      <button 
+                        class="btn btn-sm btn-warning"
+                        @click="goToReclamation(labo)"
+                        title="Réclamer sur ce laboratoire"
+                      >
+                        <i class="fas fa-exclamation-triangle mr-1"></i> Réclamer
+                      </button>
+                    </template>
+                    <template v-else>
+                      <button class="btn btn-sm btn-secondary" disabled>
+                        <i class="fas fa-lock mr-1"></i> Labo inactif
+                      </button>
+                    </template>
                   </td>
                 </tr>
 
-                <tr v-if="laboratoires.length === 0">
+                <tr v-if="labosFiltres.length === 0">
                   <td colspan="6" class="text-center text-muted">
                     Aucun laboratoire trouvé
                   </td>
@@ -104,24 +128,94 @@
         </div>
       </div>
     </section>
+
+    <!-- Modal Équipements du Laboratoire -->
+    <div class="modal fade" :class="{ show: showEquipmentsModal }" :style="{ display: showEquipmentsModal ? 'block' : 'none' }">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header bg-info text-white">
+            <h5 class="modal-title">
+              <i class="fas fa-cogs mr-2"></i>
+              Équipements de {{ selectedLabo?.nomLabo }}
+            </h5>
+            <button type="button" class="close text-white" @click="closeEquipmentsModal">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div v-if="selectedLabo?.equipements && selectedLabo.equipements.length > 0">
+              <table class="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nom</th>
+                    <th>État</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="equip in selectedLabo.equipements" :key="equip.id">
+                    <td>{{ equip.id }}</td>
+                    <td>{{ equip.nom }}</td>
+                    <td>
+                      <span :class="getEquipEtatBadge(equip.etat)">
+                        {{ formatEquipEtat(equip.etat) }}
+                      </span>
+                    </td>
+                    <td>
+                      <button 
+                        class="btn btn-warning btn-sm"
+                        @click="goToReclamationEquip(selectedLabo, equip)"
+                      >
+                        <i class="fas fa-exclamation-triangle mr-1"></i> Réclamer
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="text-center text-muted p-4">
+              <i class="fas fa-inbox fa-2x mb-2"></i>
+              <p>Aucun équipement dans ce laboratoire</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeEquipmentsModal">Fermer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" v-if="showEquipmentsModal"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMesLabos } from '@/Service/LaboratoireService'
+import { getLaboratoires } from '@/Service/LaboratoireService'
+import { getActiveDepartements } from '@/Service/departementService'
 import { getReservationsApprouveesParLabo } from '@/Service/ReservationService'
 
 const router = useRouter()
 const laboratoires = ref<any[]>([])
+const departements = ref<any[]>([])
+const selectedDepartement = ref('')
 const reservationsParLabo = ref<Record<number, any[]>>({})
+const showEquipmentsModal = ref(false)
+const selectedLabo = ref<any>(null)
+
+const labosFiltres = computed(() => {
+  if (!selectedDepartement.value) return laboratoires.value
+  return laboratoires.value.filter(
+    l => l.departement?.nom === selectedDepartement.value
+  )
+})
 
 onMounted(async () => {
   try {
-    const res = await getMesLabos()
-    laboratoires.value = Array.isArray(res.data) ? res.data : []
-    console.log('Mes laboratoires :', laboratoires.value)
+    const labosRes = await getLaboratoires()
+    laboratoires.value = Array.isArray(labosRes.data) ? labosRes.data : []
+
+    const depsRes = await getActiveDepartements()
+    departements.value = Array.isArray(depsRes.data) ? depsRes.data : []
     
     // Charger les réservations approuvées pour chaque labo
     for (const labo of laboratoires.value) {
@@ -223,6 +317,52 @@ function goToReclamation(labo: any) {
   })
 }
 
+// Afficher le modal des équipements
+function showEquipementsModal(labo: any) {
+  selectedLabo.value = labo
+  showEquipmentsModal.value = true
+}
+
+// Fermer le modal
+function closeEquipmentsModal() {
+  showEquipmentsModal.value = false
+  selectedLabo.value = null
+}
+
+// Badge état équipement
+function getEquipEtatBadge(etat: string) {
+  const badges: Record<string, string> = {
+    FONCTIONNEL: 'badge badge-success',
+    EN_PANNE: 'badge badge-danger',
+    EN_MAINTENANCE: 'badge badge-warning'
+  }
+  return badges[etat] || 'badge badge-secondary'
+}
+
+// Format état équipement
+function formatEquipEtat(etat: string) {
+  const labels: Record<string, string> = {
+    FONCTIONNEL: 'Fonctionnel',
+    EN_PANNE: 'En panne',
+    EN_MAINTENANCE: 'En maintenance'
+  }
+  return labels[etat] || etat
+}
+
+// Rediriger vers réclamation avec équipement pré-sélectionné
+function goToReclamationEquip(labo: any, equip: any) {
+  closeEquipmentsModal()
+  router.push({ 
+    path: '/etudiant/nouvelle-reclamation', 
+    query: { 
+      laboratoireId: labo.id, 
+      laboratoireNom: labo.nomLabo,
+      equipementId: equip.id,
+      equipementNom: equip.nom
+    } 
+  })
+}
+
 // Vérifie si on peut réclamer sur ce labo
 function canReclamer(labo: any): boolean {
   return labo.etatLabo !== 'INACTIF' && labo.etatLabo !== 'EN_MAINTENANCE'
@@ -294,5 +434,8 @@ function etatBadge(etat: string) {
 .btn:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+.modal.show {
+  background: rgba(0, 0, 0, 0.5);
 }
 </style>

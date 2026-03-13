@@ -51,38 +51,52 @@
             <table class="table table-bordered table-striped table-hover">
               <thead class="bg-success">
                 <tr>
-                  <th>ID</th>
+                  <th>N°</th>
                   <th>Nom</th>
                   <th>Prénom</th>
                   <th>Email</th>
                   <th>CIN</th>
                   <th>Département</th>
                   <th>Créé le</th>
+                  <th>Statut</th>
                   <th class="text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="e in filteredEtudiants" :key="e.id">
-                  <td>{{ e.id }}</td>
+                <tr v-for="(e, index) in filteredEtudiants" :key="e.id">
+                  <td>{{ index + 1 }}</td>
                   <td>{{ e.nom }}</td>
                   <td>{{ e.prenom }}</td>
                   <td>{{ e.email }}</td>
                   <td>{{ e.cin }}</td>
                   <td>{{ e.departement?.nom || 'N/A' }}</td>
                   <td>{{ formatDate(e.createdAt) }}</td>
+                  <td>
+                    <span :class="!e.active ? 'badge badge-danger' : 'badge badge-success'">
+                      {{ !e.active ? 'Bloqué' : 'Actif' }}
+                    </span>
+                  </td>
                   <td class="text-center">
                     <div class="d-flex justify-content-center gap-2">
-                      <button class="btn btn-primary btn-sm" @click="openModal(e)">
-                        <i class="fas fa-edit mr-1"></i>Modifier
+                      <button 
+                        class="btn btn-danger btn-sm" 
+                        @click="handleBlock(e.id)"
+                        :disabled="!e.active"
+                      >
+                        <i class="fas fa-ban mr-1"></i>Bloquer
                       </button>
-                      <button class="btn btn-danger btn-sm" @click="handleDelete(e.id)">
-                        <i class="fas fa-trash mr-1"></i>Supprimer
+                      <button 
+                        class="btn btn-success btn-sm" 
+                        @click="handleUnblock(e.id)"
+                        :disabled="e.active"
+                      >
+                        <i class="fas fa-unlock mr-1"></i>Débloquer
                       </button>
                     </div>
                   </td>
                 </tr>
                 <tr v-if="filteredEtudiants.length === 0">
-                  <td colspan="8" class="text-center">Aucun étudiant trouvé</td>
+                  <td colspan="9" class="text-center">Aucun étudiant trouvé</td>
                 </tr>
               </tbody>
             </table>
@@ -158,7 +172,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import api from '@/Service/api'
-import { getEtudiants, createEtudiant, updateEtudiant, deleteUser } from '@/Service/UserService'
+import { getEtudiants, createEtudiant, updateEtudiant, deleteUser, blockUser, unblockUser } from '@/Service/UserService'
 
 const etudiants = ref<any[]>([])
 const departements = ref<any[]>([])
@@ -288,6 +302,28 @@ async function handleDelete(id: number) {
     await loadEtudiants()
   } catch (error) {
     console.error('Erreur suppression:', error)
+  }
+}
+
+async function handleBlock(id: number) {
+  if (!confirm('Êtes-vous sûr de vouloir bloquer cet étudiant ?')) return
+  try {
+    await blockUser(id)
+    await loadEtudiants()
+  } catch (error: any) {
+    console.error('Erreur blocage:', error)
+    alert(error.response?.data?.message || 'Impossible de bloquer l\'étudiant.')
+  }
+}
+
+async function handleUnblock(id: number) {
+  if (!confirm('Êtes-vous sûr de vouloir débloquer cet étudiant ?')) return
+  try {
+    await unblockUser(id)
+    await loadEtudiants()
+  } catch (error: any) {
+    console.error('Erreur déblocage:', error)
+    alert(error.response?.data?.message || 'Impossible de débloquer l\'étudiant.')
   }
 }
 

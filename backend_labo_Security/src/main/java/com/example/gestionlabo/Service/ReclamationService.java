@@ -1,4 +1,5 @@
 package com.example.gestionlabo.Service;
+
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,45 +11,56 @@ import com.example.gestionlabo.Repositories.ReclamationRepository;
 
 @Service
 public class ReclamationService {
-	@Autowired
+
+    @Autowired
     private ReclamationRepository reclamationRepository;
 
-    // CREATE
     public Reclamation create(Reclamation r) {
+        r.setEtat(Etat.NON_TRAITEE);
         return reclamationRepository.save(r);
     }
 
-    // READ ALL
     public List<Reclamation> findAll() {
         return reclamationRepository.findAll();
     }
 
-    // READ BY ID
     public Reclamation findById(Long id) {
         return reclamationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Réclamation introuvable"));
+                .orElseThrow(() -> new RuntimeException("Reclamation introuvable"));
     }
 
-    // UPDATE
+    public List<Reclamation> findByAuteurId(Long auteurId) {
+        return reclamationRepository.findByAuteurId(auteurId);
+    }
+
     public Reclamation update(Long id, Reclamation newData) {
         Reclamation r = findById(id);
         r.setDescription(newData.getDescription());
-        r.setEquipement(newData.getEquipement());
         r.setQuantite(newData.getQuantite());
-        r.setEtat(newData.getEtat());
+        if (newData.getEquipement() != null) r.setEquipement(newData.getEquipement());
+        if (newData.getEtat() != null) r.setEtat(newData.getEtat());
         return reclamationRepository.save(r);
     }
 
-    // TRAITER
     public Reclamation traiter(Long id) {
         Reclamation r = findById(id);
         r.setEtat(Etat.TRAITEE);
         return reclamationRepository.save(r);
     }
 
-    // DELETE
+    public Reclamation traiterAvecAction(Long id, String action, String motifRefus) {
+        Reclamation r = findById(id);
+        r.setEtat(Etat.valueOf(action));
+        return reclamationRepository.save(r);
+    }
+
+    public Reclamation autoAnnuler(Long id) {
+        Reclamation r = findById(id);
+        r.setEtat(Etat.ANNULEE);
+        return reclamationRepository.save(r);
+    }
+
     public void delete(Long id) {
         reclamationRepository.deleteById(id);
     }
-
 }

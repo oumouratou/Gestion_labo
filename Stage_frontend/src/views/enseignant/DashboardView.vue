@@ -252,6 +252,7 @@ const activeLaboratoires = computed(() =>
 const stats = computed(() => ({
   totalReclamations: reclamations.value.length,
   pendingReclamations: reclamations.value.filter(r => r.etat === 'NON_TRAITEE' || r.statut === 'NOUVELLE' || r.statut === 'EN_COURS').length,
+  resolvedReclamations: reclamations.value.filter(r => r.etat === 'TRAITEE' || r.etat === 'ANNULEE' || r.statut === 'RESOLUE').length,
   laboratoires: laboratoires.value.length, // Compte TOUS les laboratoires
   equipements: equipementsCount.value
 }))

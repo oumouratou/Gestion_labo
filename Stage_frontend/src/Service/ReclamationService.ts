@@ -89,7 +89,7 @@ const ReclamationService = {
   },
 
   // 🔹 Modifier une réclamation
-  updateReclamation: (id: number, data: { description: string; quantite: number }) =>
+  updateReclamation: (id: number, data: { description: string; quantite?: number }) =>
     api.put(`/${id}`, data),
 
   // 🔹 Auto-annuler (par l'auteur lui-même, sans notification)

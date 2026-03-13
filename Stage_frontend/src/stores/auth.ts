@@ -38,6 +38,14 @@ export const useAuthStore = defineStore('auth', {
       const user = AuthService.getCurrentUser()
       const token = AuthService.getToken()
       if (user && token) {
+        // Vérifier si l'utilisateur est bloqué (active === false)
+        if (user.active === false) {
+          AuthService.logout()
+          this.currentUser = null
+          this.token = null
+          this.isAuthenticated = false
+          return
+        }
         // Normaliser le département si nécessaire
         if (user.departementId && user.departementNom && !user.departement) {
           user.departement = { id: user.departementId, nom: user.departementNom }
@@ -65,15 +73,44 @@ export const useAuthStore = defineStore('auth', {
       this.isLoading = true
       this.error = null
       try {
-        const res = await AuthService.login(credentials)
+        const sanitizedCredentials = {
+          email: credentials.email.trim().toLowerCase(),
+          password: credentials.password
+        }
+        const res = await AuthService.login(sanitizedCredentials)
         this.initAuth()
+        // Vérifier si l'utilisateur est bloqué
+        const userData = AuthService.getCurrentUser()
+        if (userData && userData.active === false) {
+          // Déconnecter immédiatement
+          AuthService.logout()
+          this.currentUser = null
+          this.token = null
+          this.isAuthenticated = false
+          this.error = 'Votre compte a été bloqué. Veuillez contacter l\'administration.'
+          return false
+        }
         // Enrichir avec le profil complet du backend
         await this.enrichUserProfile()
+        // Re-vérifier après enrichissement
+        if (this.currentUser && (this.currentUser as any).active === false) {
+          AuthService.logout()
+          this.currentUser = null
+          this.token = null
+          this.isAuthenticated = false
+          this.error = 'Votre compte a été bloqué. Veuillez contacter l\'administration.'
+          return false
+        }
         console.log('✅ Login réussi - isChefDepartement:', this.isChefDepartement)
         return true
       } catch (err: any) {
         console.error('Erreur login:', err)
-        this.error = err.response?.data?.message || 'Email ou mot de passe incorrect'
+        const errorMsg = err.response?.data?.message || err.response?.data || ''
+        if (typeof errorMsg === 'string' && (errorMsg.toLowerCase().includes('bloqu') || errorMsg.toLowerCase().includes('block'))) {
+          this.error = 'Votre compte a été bloqué. Veuillez contacter l\'administration.'
+        } else {
+          this.error = err.response?.data?.message || 'Email ou mot de passe incorrect'
+        }
         return false
       } finally {
         this.isLoading = false

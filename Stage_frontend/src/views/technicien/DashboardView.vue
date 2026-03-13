@@ -44,7 +44,7 @@
         <table class="table table-hover mb-0" v-if="recentReclamationsNonTraitees.length">
           <thead class="bg-light">
             <tr>
-              <th>ID</th>
+              <th>N°</th>
               <th>Auteur</th>
               <th>CIN</th>
               <th>Rôle</th>
@@ -56,8 +56,8 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="rec in recentReclamationsNonTraitees" :key="rec.id">
-              <td><strong>#{{ rec.id }}</strong></td>
+            <tr v-for="(rec, index) in recentReclamationsNonTraitees" :key="rec.id">
+              <td><strong>{{ index + 1 }}</strong></td>
               <td>{{ getAuteurNom(rec) }}</td>
               <td>{{ rec.cinAuteur || 'N/A' }}</td>
               <td><span :class="getRoleBadge(rec.roleAuteur)">{{ formatRole(rec.roleAuteur) }}</span></td>
@@ -94,7 +94,7 @@
         <table class="table table-hover mb-0" v-if="recentReclamationsTraitees.length">
           <thead class="bg-light">
             <tr>
-              <th>ID</th>
+              <th>N°</th>
               <th>Auteur</th>
               <th>Description</th>
               <th>État</th>
@@ -102,11 +102,11 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="rec in recentReclamationsTraitees" :key="rec.id">
-              <td>#{{ rec.id }}</td>
+            <tr v-for="(rec, index) in recentReclamationsTraitees" :key="rec.id">
+              <td>{{ index + 1 }}</td>
               <td>{{ getAuteurNom(rec) }}</td>
               <td>{{ truncate(rec.description, 50) }}</td>
-              <td><span :class="badgeEtat(rec.etat || rec.statut)">{{ formatEtat(rec.etat || rec.statut) }}</span></td>
+              <td><span :class="badgeEtat(rec.etat || rec.statut || 'INCONNU')">{{ formatEtat(rec.etat || rec.statut || 'INCONNU') }}</span></td>
               <td>{{ formatDate(rec.dateReclamation || rec.dateCreation) }}</td>
             </tr>
           </tbody>

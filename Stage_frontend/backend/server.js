@@ -11,11 +11,11 @@ app.use(express.json())
 // ==================== DONNÉES EN MÉMOIRE ====================
 
 let departements = [
-  { id: 1, nom: 'Informatique', description: 'Département d\'informatique et de génie logiciel' },
-  { id: 2, nom: 'Mathématiques', description: 'Département de mathématiques et statistiques' },
-  { id: 3, nom: 'Physique', description: 'Département de physique et sciences appliquées' },
-  { id: 4, nom: 'Chimie', description: 'Département de chimie et biochimie' },
-  { id: 5, nom: 'Génie Civil', description: 'Département de génie civil et construction' }
+  { id: 1, nom: 'Informatique', description: 'Département d\'informatique et de génie logiciel', actif: true },
+  { id: 2, nom: 'Mathématiques', description: 'Département de mathématiques et statistiques', actif: true },
+  { id: 3, nom: 'Physique', description: 'Département de physique et sciences appliquées', actif: true },
+  { id: 4, nom: 'Chimie', description: 'Département de chimie et biochimie', actif: true },
+  { id: 5, nom: 'Génie Civil', description: 'Département de génie civil et construction', actif: true }
 ]
 
 let laboratoires = [
@@ -37,12 +37,12 @@ let equipements = [
 ]
 
 let users = [
-  { id: 1, nom: 'Admin', prenom: 'Technicien', email: 'tech@univ.fr', password: 'admin123', cin: 'AB123456', role: 'TECHNICIEN', departementId: 1 },
-  { id: 2, nom: 'Martin', prenom: 'Alice', email: 'alice@univ.fr', password: 'alice123', cin: 'CD234567', role: 'ETUDIANT', departementId: 1 },
-  { id: 3, nom: 'Durand', prenom: 'Bob', email: 'bob@univ.fr', password: 'bob123', cin: 'EF345678', role: 'ETUDIANT', departementId: 1 },
-  { id: 4, nom: 'Bernard', prenom: 'Claire', email: 'claire@univ.fr', password: 'claire123', cin: 'GH456789', role: 'ETUDIANT', departementId: 2 },
-  { id: 5, nom: 'Dupont', prenom: 'Jean', email: 'jean@univ.fr', password: 'jean123', cin: 'IJ567890', role: 'ENSEIGNANT', departementId: 1 },
-  { id: 6, nom: 'Moreau', prenom: 'Marie', email: 'marie@univ.fr', password: 'marie123', cin: 'KL678901', role: 'ENSEIGNANT', departementId: 2 }
+  { id: 1, nom: 'Admin', prenom: 'Technicien', email: 'tech@univ.fr', password: 'admin123', cin: 'AB123456', role: 'TECHNICIEN', departementId: 1, active: true },
+  { id: 2, nom: 'Martin', prenom: 'Alice', email: 'alice@univ.fr', password: 'alice123', cin: 'CD234567', role: 'ETUDIANT', departementId: 1, active: true },
+  { id: 3, nom: 'Durand', prenom: 'Bob', email: 'bob@univ.fr', password: 'bob123', cin: 'EF345678', role: 'ETUDIANT', departementId: 1, active: true },
+  { id: 4, nom: 'Bernard', prenom: 'Claire', email: 'claire@univ.fr', password: 'claire123', cin: 'GH456789', role: 'ETUDIANT', departementId: 2, active: true },
+  { id: 5, nom: 'Dupont', prenom: 'Jean', email: 'jean@univ.fr', password: 'jean123', cin: 'IJ567890', role: 'ENSEIGNANT', departementId: 1, active: true },
+  { id: 6, nom: 'Moreau', prenom: 'Marie', email: 'marie@univ.fr', password: 'marie123', cin: 'KL678901', role: 'ENSEIGNANT', departementId: 2, active: true }
 ]
 
 let reservations = [
@@ -196,7 +196,7 @@ app.get('/api/departements/:id', (req, res) => {
 })
 
 app.post('/api/departements', (req, res) => {
-  const newDept = { id: nextDepartementId++, ...req.body }
+  const newDept = { id: nextDepartementId++, actif: true, ...req.body }
   departements.push(newDept)
   res.status(201).json(newDept)
 })
@@ -322,15 +322,48 @@ app.get('/api/enseignants', (req, res) => {
 })
 
 app.post('/api/users/etudiants', (req, res) => {
-  const newUser = { id: nextUserId++, role: 'ETUDIANT', ...req.body }
+  const newUser = { id: nextUserId++, role: 'ETUDIANT', active: true, ...req.body }
   users.push(newUser)
   res.status(201).json(enrichUser(newUser))
 })
 
 app.post('/api/users/enseignants', (req, res) => {
-  const newUser = { id: nextUserId++, role: 'ENSEIGNANT', ...req.body }
+  const newUser = { id: nextUserId++, role: 'ENSEIGNANT', active: true, ...req.body }
   users.push(newUser)
   res.status(201).json(enrichUser(newUser))
+})
+
+// Compatibilite avec le front: blocage/deblocage d'un utilisateur
+app.put('/api/users/:id/block', (req, res) => {
+  const index = users.findIndex(u => u.id === parseInt(req.params.id))
+  if (index === -1) return res.status(404).json({ error: 'Utilisateur non trouvé' })
+
+  users[index].active = false
+  res.json({ message: 'Utilisateur bloqué', user: enrichUser(users[index]) })
+})
+
+app.put('/api/users/:id/unblock', (req, res) => {
+  const index = users.findIndex(u => u.id === parseInt(req.params.id))
+  if (index === -1) return res.status(404).json({ error: 'Utilisateur non trouvé' })
+
+  users[index].active = true
+  res.json({ message: 'Utilisateur débloqué', user: enrichUser(users[index]) })
+})
+
+app.put('/api/users/etudiants/:id/block', (req, res) => {
+  const index = users.findIndex(u => u.id === parseInt(req.params.id) && u.role === 'ETUDIANT')
+  if (index === -1) return res.status(404).json({ error: 'Étudiant non trouvé' })
+
+  users[index].active = false
+  res.json({ message: 'Étudiant bloqué', user: enrichUser(users[index]) })
+})
+
+app.put('/api/users/etudiants/:id/unblock', (req, res) => {
+  const index = users.findIndex(u => u.id === parseInt(req.params.id) && u.role === 'ETUDIANT')
+  if (index === -1) return res.status(404).json({ error: 'Étudiant non trouvé' })
+
+  users[index].active = true
+  res.json({ message: 'Étudiant débloqué', user: enrichUser(users[index]) })
 })
 
 app.put('/api/users/:id', (req, res) => {

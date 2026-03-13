@@ -778,14 +778,15 @@ async function loadDepartements(retryCount = 0) {
     console.log('Départements chargés:', response.data)
     
     if (Array.isArray(response.data)) {
-      departements.value = response.data
+      departements.value = response.data.filter((d: any) => d.actif !== false)
     } else if (response.data && Array.isArray(response.data.content)) {
-      departements.value = response.data.content
+      departements.value = response.data.content.filter((d: any) => d.actif !== false)
     } else if (response.data && typeof response.data === 'object') {
       // Essayer de récupérer les départements d'un format différent
       const keys = Object.keys(response.data)
-      if (keys.length > 0 && Array.isArray(response.data[keys[0]])) {
-        departements.value = response.data[keys[0]]
+      const firstKey = keys[0]
+      if (firstKey && Array.isArray(response.data[firstKey])) {
+        departements.value = response.data[firstKey]
       } else {
         departements.value = []
       }

@@ -43,9 +43,10 @@
               <table class="table table-bordered table-striped table-hover" v-if="reclamationsEtudiantsFiltrees.length">
               <thead class="bg-info text-white">
                 <tr>
-                  <th width="60">ID</th>
+                  <th width="60">N°</th>
                   <th>Auteur</th>
                   <th>Équipement</th>
+                  <th>Identifiant</th>
                   <th>Description</th>
                   <th width="100">Priorité</th>
                   <th width="110">Statut</th>
@@ -55,14 +56,15 @@
               </thead>
               <tbody>
                 <tr 
-                  v-for="rec in reclamationsEtudiantsFiltrees" 
+                  v-for="(rec, index) in reclamationsEtudiantsFiltrees" 
                   :key="rec.id"
                   :class="{ 'highlight-row': highlightedId === rec.id }"
                   :ref="el => { if (highlightedId === rec.id) highlightedRow = el }"
                 >
-                  <td><strong>#{{ rec.id }}</strong></td>
+                  <td><strong>{{ index + 1 }}</strong></td>
                   <td>{{ getAuteurNom(rec) }}</td>
                   <td>{{ rec.equipement?.nom || rec.equipementNom || 'N/A' }}</td>
+                  <td><code class="text-primary">{{ getEquipementIdentifiant(rec) }}</code></td>
                   <td>{{ truncateText(rec.description, 50) }}</td>
                   <td><span :class="getPrioriteBadge(getPriorite(rec))">{{ formatPriorite(getPriorite(rec)) }}</span></td>
                   <td>
@@ -103,9 +105,10 @@
             <table class="table table-bordered table-striped table-hover" v-if="reclamationsEnseignantsFiltrees.length">
               <thead class="bg-info text-white">
                 <tr>
-                  <th width="60">ID</th>
+                  <th width="60">N°</th>
                   <th>Enseignant</th>
                   <th>Équipement</th>
+                  <th>Identifiant</th>
                   <th>Description</th>
                   <th width="100">Priorité</th>
                   <th width="110">Statut</th>
@@ -115,14 +118,15 @@
               </thead>
               <tbody>
                 <tr 
-                  v-for="rec in reclamationsEnseignantsFiltrees" 
+                  v-for="(rec, index) in reclamationsEnseignantsFiltrees" 
                   :key="rec.id"
                   :class="{ 'highlight-row': highlightedId === rec.id }"
                   :ref="el => { if (highlightedId === rec.id) highlightedRow = el }"
                 >
-                  <td><strong>#{{ rec.id }}</strong></td>
+                  <td><strong>{{ index + 1 }}</strong></td>
                   <td>{{ getAuteurNom(rec) }}</td>
                   <td>{{ rec.equipement?.nom || rec.equipementNom || 'N/A' }}</td>
+                  <td><code class="text-primary">{{ getEquipementIdentifiant(rec) }}</code></td>
                   <td>{{ truncateText(rec.description, 50) }}</td>
                   <td><span :class="getPrioriteBadge(getPriorite(rec))">{{ formatPriorite(getPriorite(rec)) }}</span></td>
                   <td>
@@ -210,12 +214,14 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ReclamationService from '@/Service/ReclamationService'
+import { getEquipements } from '@/Service/EquipementService'
 
 const route = useRoute()
 const router = useRouter()
 
 const reclamationsEtudiants = ref<any[]>([])
 const reclamationsEnseignants = ref<any[]>([])
+const allEquipements = ref<any[]>([])
 const loading = ref(true)
 const error = ref('')
 const highlightedId = ref<number | null>(null)
@@ -269,6 +275,16 @@ async function fetchReclamations() {
   loading.value = true
   error.value = ''
   try {
+    // Charger les équipements pour les identifiants
+    try {
+      const eqRes = await getEquipements()
+      allEquipements.value = Array.isArray(eqRes.data) ? eqRes.data : []
+      console.log('Équipements chargés pour identifiants:', allEquipements.value.length, allEquipements.value.slice(0, 3))
+    } catch (eqErr) {
+      console.error('Erreur chargement équipements:', eqErr)
+      allEquipements.value = []
+    }
+
     console.log("Chargement des réclamations...")
     
     const res = await ReclamationService.getAllReclamations()
@@ -350,6 +366,30 @@ function getAuteurNom(rec: any) {
     return `${rec.auteur.prenom || ''} ${rec.auteur.nom || ''}`.trim() || 'N/A'
   }
   return `${rec.prenomAuteur || ''} ${rec.nomAuteur || ''}`.trim() || 'N/A'
+}
+
+function getEquipementIdentifiant(rec: any): string {
+  // 1. Directement depuis l'objet equipement de la réclamation
+  if (rec.equipement?.identifiant) return rec.equipement.identifiant
+  // 2. Champ plat sur la réclamation
+  if (rec.equipementIdentifiant) return rec.equipementIdentifiant
+  if (rec.identifiantEquipement) return rec.identifiantEquipement
+  // 3. Chercher dans la liste complète des équipements
+  const equipId = rec.equipementId || rec.equipement?.id
+  if (equipId && allEquipements.value.length > 0) {
+    const equip = allEquipements.value.find((e: any) => e.id === equipId)
+    if (equip?.identifiant) return equip.identifiant
+  }
+  // 4. Générer un identifiant à partir du nom et de l'ID
+  const equipNom = rec.equipement?.nom || rec.equipementNom
+  if (equipNom && equipId) {
+    const prefix = equipNom.substring(0, 3).toUpperCase()
+    return `${prefix}-${String(equipId).padStart(4, '0')}`
+  }
+  if (equipId) {
+    return `EQ-${String(equipId).padStart(4, '0')}`
+  }
+  return 'N/A'
 }
 
 function truncateText(text: string, maxLength: number) {
@@ -469,5 +509,15 @@ onMounted(async () => {
 @keyframes highlightPulse {
   0%, 100% { background-color: #d1fae5; }
   50% { background-color: #a7f3d0; }
+}
+
+@media (max-width: 768px) {
+  .page-container { padding: 8px; }
+  .content-header h1 { font-size: 1.2rem; }
+  .card { border-radius: 8px; }
+  .table th, .table td { font-size: 12px; padding: 6px 4px; }
+  .btn-sm { font-size: 11px; padding: 3px 6px; }
+  .btn-group { display: flex; flex-direction: column; gap: 4px; }
+  .btn-group .btn { border-radius: 4px !important; }
 }
 </style>

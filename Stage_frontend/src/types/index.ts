@@ -1,7 +1,7 @@
 // Types pour l'application de gestion des laboratoires
 
 export type UserRole = 'technicien' | 'enseignant' | 'etudiant'
-export type UserRoleAPI = 'TECHNICIEN' | 'ENSEIGNANT' | 'ETUDIANT'
+export type UserRoleAPI = 'TECHNICIEN' | 'ENSEIGNANT' | 'ETUDIANT' | 'technicien' | 'enseignant' | 'etudiant'
 
 export interface User {
   id: number
@@ -27,6 +27,7 @@ export interface Departement {
   id: number
   nom: string
   description?: string
+  actif?: boolean
 }
 
 export interface Laboratoire {
@@ -49,7 +50,7 @@ export interface Equipement {
   description?: string
   caracteristique?: string
   quantite?: number
-  etat: 'disponible' | 'en_panne' | 'maintenance' | 'DISPONIBLE' | 'EN_PANNE' | 'MAINTENANCE' | 'EN_MAINTENANCE' | 'FONCTIONNEL'
+  etat: 'disponible' | 'en_panne' | 'maintenance' | 'fonctionnel' | 'en_maintenance' | 'DISPONIBLE' | 'EN_PANNE' | 'MAINTENANCE' | 'EN_MAINTENANCE' | 'FONCTIONNEL'
   statut?: string
   dateAcquisition?: string
   imageUrl?: string
@@ -64,7 +65,7 @@ export interface Reservation {
   dateReservation: string
   heureDebut: string
   heureFin: string
-  statut: 'EN_ATTENTE' | 'APPROUVEE' | 'REFUSEE'
+  statut: 'EN_ATTENTE' | 'APPROUVEE' | 'REFUSEE' | 'en_attente' | 'confirmee' | 'annulee'
   motif?: string
   etudiantId?: number
   etudiant?: User
@@ -74,11 +75,12 @@ export interface Reservation {
 
 export interface Reclamation {
   id: number
-  titre: string
+  titre?: string
   description: string
-  priorite: 'BASSE' | 'MOYENNE' | 'HAUTE'
-  statut: 'NOUVELLE' | 'EN_COURS' | 'RESOLUE'
+  priorite: 'BASSE' | 'MOYENNE' | 'HAUTE' | 'basse' | 'moyenne' | 'haute' | 'urgente'
+  statut: 'NOUVELLE' | 'EN_COURS' | 'RESOLUE' | 'en_attente' | 'en_cours'
   dateCreation?: string
+  dateReclamation?: string
   enseignantId?: number
   enseignant?: User
   equipementId?: number

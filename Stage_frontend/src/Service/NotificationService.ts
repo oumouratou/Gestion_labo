@@ -124,3 +124,23 @@ export async function markAllNotificationsAsRead(): Promise<void> {
 export async function deleteNotification(id: number): Promise<void> {
   return api.delete(`/notifications/${id}`, { withCredentials: true })
 }
+
+// ----------------- Envoyer une alerte/notification à un utilisateur -----------------
+export async function sendAlertToUser(userId: number, message: string): Promise<any> {
+  // Priorité à l'endpoint backend Spring dédié
+  try {
+    return await api.post(`/notifications/send/${userId}`, { message }, { withCredentials: true })
+  } catch (e1: any) {
+    if (e1.response?.status === 404 || e1.response?.status === 405) {
+      try {
+        return await api.post(`/notifications/alert/${userId}`, { message }, { withCredentials: true })
+      } catch (e2: any) {
+        if (e2.response?.status === 404 || e2.response?.status === 405) {
+          return await api.post('/notifications', { userId, message, type: 'ALERT' }, { withCredentials: true })
+        }
+        throw e2
+      }
+    }
+    throw e1
+  }
+}

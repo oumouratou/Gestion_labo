@@ -1,14 +1,19 @@
-import axios from 'axios';
+import api from '@/Service/api';
 
-const API_URL = 'http://localhost:8085/api/auth/';
+const AUTH_BASE = '/auth';
 
 const AuthService = {
   register(user: any) {
-    return axios.post(API_URL + 'register', user);
+    return api.post(`${AUTH_BASE}/register`, user);
   },
 
   login(credentials: any) {
-    return axios.post(API_URL + 'login', credentials).then(response => {
+    const normalizedCredentials = {
+      email: typeof credentials?.email === 'string' ? credentials.email.trim().toLowerCase() : credentials?.email,
+      password: credentials?.password
+    };
+
+    return api.post(`${AUTH_BASE}/login`, normalizedCredentials).then(response => {
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data));

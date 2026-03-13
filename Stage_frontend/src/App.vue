@@ -36,9 +36,29 @@ onMounted(() => {
 </script>
 
 <style>
-html, body {
-  height: 100%;
+html,
+body,
+#app {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
 }
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.app-wrapper {
+  width: 100%;
+  min-height: 100vh;
+}
+
 .main-sidebar {
   min-height: 100vh;
 }

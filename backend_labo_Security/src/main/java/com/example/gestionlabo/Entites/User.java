@@ -8,6 +8,7 @@ import java.util.List;
 import com.example.gestionlabo.Enums.Role;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
+
 @Getter
 @Setter
 @Entity
@@ -37,6 +38,12 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    @Column(name = "is_active")
+    private boolean active = true;
+
+    @Column(name = "is_chef_departement")
+    private boolean chefDepartement = false;
+
     @ManyToOne
     @JoinColumn(name="departement_id")
     private Departement departement;
@@ -52,12 +59,12 @@ public class User {
     @OneToMany(mappedBy = "etudiant")
     @JsonIgnore
     private List<Reservation> reservations;
-    
+
     @Column(name="created_at")
     private LocalDateTime createdAt;
 
     @PrePersist
     public void prePersist() {
-        this.createdAt = LocalDateTime.now(); // sera rempli automatiquement à l'insertion
+        this.createdAt = LocalDateTime.now();
     }
 }
