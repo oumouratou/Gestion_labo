@@ -24,5 +24,9 @@ export default defineConfig({
         secure: false,
       }
     }
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
   }
 })

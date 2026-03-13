@@ -1,7 +1,13 @@
 import axios from "axios";
 
+// En développement : "/api" passe par le proxy Vite → localhost:8085
+// En production : VITE_API_URL doit pointer vers le backend déployé (ex: https://monbackend.railway.app)
+const baseURL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : "/api";
+
 const api = axios.create({
-  baseURL: "/api",  // URL relative - passera par le proxy Vite
+  baseURL,  // URL relative en dev, URL absolue en prod
   headers: {
     "Content-Type": "application/json"
   },
