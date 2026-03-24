@@ -10,6 +10,13 @@ export interface User {
   email?: string
   cin?: string
   role: UserRoleAPI
+  niveau?: string
+  classe?: string
+  attestationUrl?: string
+  attestationOriginalName?: string
+  attestationMimeType?: string
+  attestationSize?: number
+  attestationVerifiee?: boolean
   departement?: {
     id: number
     nom: string

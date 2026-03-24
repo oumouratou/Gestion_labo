@@ -43,7 +43,8 @@
               <table class="table table-bordered table-striped table-hover" v-if="reclamationsEtudiantsFiltrees.length">
               <thead class="bg-info text-white">
                 <tr>
-                  <th width="60">N°</th>
+                  <th width="60">Numéro</th>
+                  <th width="110" class="text-center">Détails</th>
                   <th>Auteur</th>
                   <th>Équipement</th>
                   <th>Identifiant</th>
@@ -62,6 +63,11 @@
                   :ref="el => { if (highlightedId === rec.id) highlightedRow = el }"
                 >
                   <td><strong>{{ index + 1 }}</strong></td>
+                  <td class="text-center">
+                    <button class="btn btn-info btn-sm" @click="openDetailsModal(rec)">
+                      <i class="fas fa-info-circle mr-1"></i> Détails
+                    </button>
+                  </td>
                   <td>{{ getAuteurNom(rec) }}</td>
                   <td>{{ rec.equipement?.nom || rec.equipementNom || 'N/A' }}</td>
                   <td><code class="text-primary">{{ getEquipementIdentifiant(rec) }}</code></td>
@@ -105,7 +111,8 @@
             <table class="table table-bordered table-striped table-hover" v-if="reclamationsEnseignantsFiltrees.length">
               <thead class="bg-info text-white">
                 <tr>
-                  <th width="60">N°</th>
+                  <th width="60">Numéro</th>
+                  <th width="110" class="text-center">Détails</th>
                   <th>Enseignant</th>
                   <th>Équipement</th>
                   <th>Identifiant</th>
@@ -124,6 +131,11 @@
                   :ref="el => { if (highlightedId === rec.id) highlightedRow = el }"
                 >
                   <td><strong>{{ index + 1 }}</strong></td>
+                  <td class="text-center">
+                    <button class="btn btn-info btn-sm" @click="openDetailsModal(rec)">
+                      <i class="fas fa-info-circle mr-1"></i> Détails
+                    </button>
+                  </td>
                   <td>{{ getAuteurNom(rec) }}</td>
                   <td>{{ rec.equipement?.nom || rec.equipementNom || 'N/A' }}</td>
                   <td><code class="text-primary">{{ getEquipementIdentifiant(rec) }}</code></td>
@@ -207,6 +219,48 @@
       </div>
     </div>
     <div class="modal-backdrop fade show" v-if="showRejectModal"></div>
+
+    <!-- Modal détails demandeur -->
+    <div class="modal fade" :class="{ show: showDetailsModal }" :style="{ display: showDetailsModal ? 'block' : 'none' }">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header bg-info text-white">
+            <h5 class="modal-title"><i class="fas fa-user-circle mr-2"></i>Détails du demandeur</h5>
+            <button type="button" class="close text-white" @click="closeDetailsModal">&times;</button>
+          </div>
+          <div class="modal-body">
+            <table class="table table-bordered mb-0" v-if="selectedDetailsReclamation">
+              <tbody>
+                <tr>
+                  <th style="width: 230px;">Nom complet</th>
+                  <td>{{ getAuteurNom(selectedDetailsReclamation) }}</td>
+                </tr>
+                <tr>
+                  <th>CIN</th>
+                  <td>{{ getAuteurCin(selectedDetailsReclamation) }}</td>
+                </tr>
+                <tr v-if="!isEnseignantReclamation(selectedDetailsReclamation)">
+                  <th>Niveau</th>
+                  <td>{{ getAuteurNiveau(selectedDetailsReclamation) }}</td>
+                </tr>
+                <tr v-if="!isEnseignantReclamation(selectedDetailsReclamation)">
+                  <th>Classe</th>
+                  <td>{{ getAuteurClasse(selectedDetailsReclamation) }}</td>
+                </tr>
+                <tr>
+                  <th>Département</th>
+                  <td>{{ getAuteurDepartement(selectedDetailsReclamation) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeDetailsModal">Fermer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" v-if="showDetailsModal"></div>
   </div>
 </template>
 
@@ -214,6 +268,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ReclamationService from '@/Service/ReclamationService'
+import api from '@/Service/api'
 import { getEquipements } from '@/Service/EquipementService'
 
 const route = useRoute()
@@ -226,11 +281,14 @@ const loading = ref(true)
 const error = ref('')
 const highlightedId = ref<number | null>(null)
 const highlightedRow = ref<any>(null)
+const userDetailsCache = new Map<number, any>()
 
 // Modal de refus
 const showRejectModal = ref(false)
 const selectedReclamation = ref<any | null>(null)
 const rejectMotif = ref('')
+const showDetailsModal = ref(false)
+const selectedDetailsReclamation = ref<any | null>(null)
 
 // Filtres depuis les query params
 const filterLaboId = computed(() => route.query.laboratoireId ? Number(route.query.laboratoireId) : null)
@@ -271,6 +329,82 @@ function clearFilter() {
   router.replace({ path: '/technicien/reclamations' })
 }
 
+function pickFirstText(...values: any[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim()
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  }
+  return undefined
+}
+
+function extractAuteurId(rec: any): number | null {
+  const rawId = rec?.auteurId ?? rec?.userId ?? rec?.enseignant?.id ?? rec?.auteur?.id
+  const parsed = Number(rawId)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+async function fetchUserDetailsById(userId: number): Promise<any | null> {
+  if (userDetailsCache.has(userId)) return userDetailsCache.get(userId)
+
+  try {
+    const byId = await api.get(`/users/${userId}`)
+    if (byId?.data) {
+      userDetailsCache.set(userId, byId.data)
+      return byId.data
+    }
+  } catch {
+    // fallback sur /users si /users/{id} indisponible
+  }
+
+  try {
+    const usersRes = await api.get('/users')
+    const users = Array.isArray(usersRes?.data)
+      ? usersRes.data
+      : Array.isArray(usersRes?.data?.content)
+        ? usersRes.data.content
+        : []
+    const found = users.find((u: any) => Number(u?.id) === userId) || null
+    userDetailsCache.set(userId, found)
+    return found
+  } catch {
+    userDetailsCache.set(userId, null)
+    return null
+  }
+}
+
+function mergeReclamationWithUser(rec: any, user: any) {
+  const auteur = {
+    ...(rec?.auteur || rec?.enseignant || {}),
+    ...user,
+    departement: user?.departement ?? rec?.auteur?.departement ?? rec?.enseignant?.departement,
+  }
+
+  return {
+    ...rec,
+    auteur,
+    enseignant: rec?.enseignant ? auteur : rec?.enseignant,
+    cinAuteur: rec?.cinAuteur ?? user?.cin,
+    cin: rec?.cin ?? user?.cin,
+    niveauAuteur: rec?.niveauAuteur ?? user?.niveau ?? user?.niveauEtude ?? user?.niveau_etude ?? user?.niveauScolaire,
+    classeAuteur: rec?.classeAuteur ?? user?.classe ?? user?.classeEtudiant ?? user?.classe_etudiant ?? user?.groupe,
+    departementAuteur: rec?.departementAuteur ?? user?.departementNom ?? user?.departement?.nom,
+    departementNomAuteur: rec?.departementNomAuteur ?? user?.departementNom ?? user?.departement?.nom,
+  }
+}
+
+function getEquipementIdentifiant(rec: any): string {
+  const equipId = Number(rec?.equipementId || rec?.equipement?.id)
+  if (rec?.equipementIdentifiant) return rec.equipementIdentifiant
+  if (rec?.identifiantEquipement) return rec.identifiantEquipement
+  if (rec?.equipement?.identifiant) return rec.equipement.identifiant
+  if (Number.isFinite(equipId) && equipId > 0) {
+    const equip = allEquipements.value.find((e: any) => Number(e?.id) === equipId)
+    if (equip?.identifiant) return equip.identifiant
+    return `EQ-${String(equipId).padStart(4, '0')}`
+  }
+  return 'N/A'
+}
+
 async function fetchReclamations() {
   loading.value = true
   error.value = ''
@@ -293,16 +427,64 @@ async function fetchReclamations() {
     console.log("Réclamations reçues:", data)
 
     // Filtrer par le rôle de l'utilisateur (enseignant.role ou via userId)
-    reclamationsEtudiants.value = data.filter((r: any) => {
+    let etudiants = data.filter((r: any) => {
       // Vérifier si c'est un étudiant via enseignant/auteur ou via le rôle
       const role = r.enseignant?.role || r.auteur?.role || r.roleAuteur || ''
       return role.toUpperCase().includes('ETUDIANT')
     })
     
-    reclamationsEnseignants.value = data.filter((r: any) => {
+    let enseignants = data.filter((r: any) => {
       const role = r.enseignant?.role || r.auteur?.role || r.roleAuteur || ''
       return role.toUpperCase().includes('ENSEIGNANT')
     })
+
+    etudiants = await Promise.all(
+      etudiants.map(async (rec: any) => {
+        const hasAcademic = Boolean(
+          pickFirstText(
+            rec?.niveauAuteur,
+            rec?.auteur?.niveau,
+            rec?.enseignant?.niveau,
+          ) &&
+          pickFirstText(
+            rec?.classeAuteur,
+            rec?.auteur?.classe,
+            rec?.enseignant?.classe,
+          ) &&
+          pickFirstText(
+            rec?.departementNomAuteur,
+            rec?.departementAuteur,
+            rec?.auteur?.departement?.nom,
+            rec?.enseignant?.departement?.nom,
+          )
+        )
+
+        const hasCin = Boolean(pickFirstText(rec?.cinAuteur, rec?.cin, rec?.auteur?.cin, rec?.enseignant?.cin))
+        if (hasAcademic && hasCin) return rec
+
+        const auteurId = extractAuteurId(rec)
+        if (!auteurId) return rec
+
+        const user = await fetchUserDetailsById(auteurId)
+        if (!user) return rec
+
+        return mergeReclamationWithUser(rec, user)
+      }),
+    )
+
+    enseignants = await Promise.all(
+      enseignants.map(async (rec: any) => {
+        if (pickFirstText(rec?.cinAuteur, rec?.cin, rec?.auteur?.cin, rec?.enseignant?.cin)) return rec
+        const auteurId = extractAuteurId(rec)
+        if (!auteurId) return rec
+        const user = await fetchUserDetailsById(auteurId)
+        if (!user) return rec
+        return mergeReclamationWithUser(rec, user)
+      }),
+    )
+
+    reclamationsEtudiants.value = etudiants
+    reclamationsEnseignants.value = enseignants
 
     console.log("Réclamations étudiants:", reclamationsEtudiants.value)
     console.log("Réclamations enseignants:", reclamationsEnseignants.value)
@@ -325,7 +507,26 @@ async function fetchReclamations() {
 
 async function traiterReclamation(id: number) {
   try {
+    const current = [...reclamationsEtudiants.value, ...reclamationsEnseignants.value].find((r: any) => Number(r?.id) === Number(id))
     await ReclamationService.traiterReclamation(id)
+    let processed = 0
+    let failed = 0
+    if (current) {
+      const bulkResult = await ReclamationService.traiterReclamationsLiees(
+        current,
+        [...reclamationsEtudiants.value, ...reclamationsEnseignants.value],
+      )
+      processed = bulkResult.processed
+      failed = bulkResult.failed
+    }
+
+    if (processed > 0 || failed > 0) {
+      const successPart = processed > 0 ? `${processed} réclamation(s) liée(s) traitée(s)` : ''
+      const failPart = failed > 0 ? `${failed} échec(s)` : ''
+      const details = [successPart, failPart].filter(Boolean).join(' | ')
+      alert(`Réclamation traitée. ${details}`)
+    }
+
     fetchReclamations()
   } catch (e) {
     console.error("Erreur traitement réclamation", e)
@@ -343,6 +544,16 @@ function closeRejectModal() {
   showRejectModal.value = false
   selectedReclamation.value = null
   rejectMotif.value = ''
+}
+
+function openDetailsModal(rec: any) {
+  selectedDetailsReclamation.value = rec
+  showDetailsModal.value = true
+}
+
+function closeDetailsModal() {
+  showDetailsModal.value = false
+  selectedDetailsReclamation.value = null
 }
 
 async function confirmReject() {
@@ -368,28 +579,59 @@ function getAuteurNom(rec: any) {
   return `${rec.prenomAuteur || ''} ${rec.nomAuteur || ''}`.trim() || 'N/A'
 }
 
-function getEquipementIdentifiant(rec: any): string {
-  // 1. Directement depuis l'objet equipement de la réclamation
-  if (rec.equipement?.identifiant) return rec.equipement.identifiant
-  // 2. Champ plat sur la réclamation
-  if (rec.equipementIdentifiant) return rec.equipementIdentifiant
-  if (rec.identifiantEquipement) return rec.identifiantEquipement
-  // 3. Chercher dans la liste complète des équipements
-  const equipId = rec.equipementId || rec.equipement?.id
-  if (equipId && allEquipements.value.length > 0) {
-    const equip = allEquipements.value.find((e: any) => e.id === equipId)
-    if (equip?.identifiant) return equip.identifiant
-  }
-  // 4. Générer un identifiant à partir du nom et de l'ID
-  const equipNom = rec.equipement?.nom || rec.equipementNom
-  if (equipNom && equipId) {
-    const prefix = equipNom.substring(0, 3).toUpperCase()
-    return `${prefix}-${String(equipId).padStart(4, '0')}`
-  }
-  if (equipId) {
-    return `EQ-${String(equipId).padStart(4, '0')}`
-  }
-  return 'N/A'
+function getAuteurCin(rec: any): string {
+  return pickFirstText(
+    rec?.cinAuteur,
+    rec?.cin,
+    rec?.auteur?.cin,
+    rec?.enseignant?.cin,
+  ) || 'N/A'
+}
+
+function getAuteurNiveau(rec: any): string {
+  return pickFirstText(
+    rec?.niveauAuteur,
+    rec?.auteur?.niveau,
+    rec?.auteur?.niveauEtude,
+    rec?.auteur?.niveau_etude,
+    rec?.auteur?.niveauScolaire,
+    rec?.enseignant?.niveau,
+    rec?.enseignant?.niveauEtude,
+    rec?.enseignant?.niveau_etude,
+    rec?.enseignant?.niveauScolaire,
+  ) || 'Non renseigné'
+}
+
+function getAuteurClasse(rec: any): string {
+  return pickFirstText(
+    rec?.classeAuteur,
+    rec?.auteur?.classe,
+    rec?.auteur?.classeEtudiant,
+    rec?.auteur?.classe_etudiant,
+    rec?.auteur?.groupe,
+    rec?.enseignant?.classe,
+    rec?.enseignant?.classeEtudiant,
+    rec?.enseignant?.classe_etudiant,
+    rec?.enseignant?.groupe,
+  ) || 'Non renseigné'
+}
+
+function getAuteurDepartement(rec: any): string {
+  return pickFirstText(
+    rec?.departementNomAuteur,
+    rec?.departementAuteur,
+    rec?.auteur?.departement?.nom,
+    typeof rec?.auteur?.departement === 'string' ? rec?.auteur?.departement : undefined,
+    rec?.auteur?.departementNom,
+    rec?.enseignant?.departement?.nom,
+    typeof rec?.enseignant?.departement === 'string' ? rec?.enseignant?.departement : undefined,
+    rec?.enseignant?.departementNom,
+  ) || 'Non renseigné'
+}
+
+function isEnseignantReclamation(rec: any): boolean {
+  const role = pickFirstText(rec?.roleAuteur, rec?.auteur?.role, rec?.enseignant?.role)
+  return String(role || '').toUpperCase().includes('ENSEIGNANT')
 }
 
 function truncateText(text: string, maxLength: number) {

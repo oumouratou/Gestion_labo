@@ -6,6 +6,7 @@
         <div class="row mb-2">
           <div class="col-sm-6">
             <h1><i class="fas fa-cogs mr-2"></i> Équipements</h1>
+            <small class="text-muted">Voir les équipements de tous les laboratoires</small>
           </div>
         </div>
       </div>
@@ -27,7 +28,7 @@
                 <div class="form-group">
                   <label>Département</label>
                   <select class="form-control" v-model="selectedDepartement" @change="onDepartementChange">
-                    <option value="">-- Sélectionner un département --</option>
+                    <option value="">-- Tous les départements --</option>
                     <option v-for="dept in departements" :key="dept.id" :value="dept.id">
                       {{ dept.nom }}
                     </option>
@@ -39,7 +40,7 @@
               <div class="col-md-4">
                 <div class="form-group">
                   <label>Laboratoire</label>
-                  <select class="form-control" v-model="selectedLaboratoire" :disabled="!selectedDepartement">
+                  <select class="form-control" v-model="selectedLaboratoire">
                     <option value="">-- Tous les laboratoires --</option>
                     <option v-for="labo in filteredLaboratoires" :key="labo.id" :value="labo.id">
                       {{ labo.nomLabo || labo.nom }}
@@ -60,14 +61,8 @@
           </div>
         </div>
 
-        <!-- Message si aucun département sélectionné -->
-        <div v-if="!selectedDepartement" class="alert alert-info">
-          <i class="fas fa-info-circle mr-2"></i>
-          Veuillez sélectionner un département pour afficher les laboratoires et équipements.
-        </div>
-
         <!-- Loading -->
-        <div v-else-if="loading" class="text-center p-5">
+        <div v-if="loading" class="text-center p-5">
           <i class="fas fa-spinner fa-spin fa-2x"></i>
           <p class="mt-2">Chargement des équipements...</p>
         </div>
@@ -85,27 +80,16 @@
 
               <div class="card-body text-center">
                 <div v-if="equip.imageUrl" class="mb-2">
-                  <img 
-                    :src="equip.imageUrl" 
-                    alt="Image équipement" 
-                    class="equip-image" 
-                    @error="handleImageError($event)"
-                  />
-                </div>
-                <div v-else class="mb-2">
-                  <div class="equip-image-placeholder">
-                    <i class="fas fa-image fa-2x text-muted"></i>
-                  </div>
+                  <img :src="equip.imageUrl" alt="Image équipement" class="equip-image" />
                 </div>
 
-                <p><strong>Identifiant:</strong> <code class="text-primary">{{ equip.identifiant || generateIdentifiant(equip) }}</code></p>
-                <p><strong>Description:</strong> {{ equip.caracteristique }}</p>
-                <p><strong>Laboratoire:</strong> {{ getLaboNom(equip.laboratoire?.id) }}</p>
-                <p><strong>Date acquisition:</strong> {{ equip.dateAcquisition }}</p>
+                <p><strong>Description:</strong> {{ equip.caracteristique || 'N/A' }}</p>
+                <p><strong>Laboratoire:</strong> {{ getLaboNom(equip.laboratoire?.id || equip.laboratoireId) }}</p>
+                <p><strong>Date acquisition:</strong> {{ equip.dateAcquisition || 'N/A' }}</p>
               </div>
 
               <div class="card-footer text-center">
-                <button class="btn btn-info btn-sm mr-1" @click="showDetails(equip)">
+                <button class="btn btn-info btn-sm mr-2" @click="showDetails(equip)">
                   <i class="fas fa-eye mr-1"></i> Détails
                 </button>
                 <button 
@@ -122,8 +106,9 @@
             </div>
           </div>
 
-          <div v-if="filteredEquipements.length === 0" class="col-12 text-center text-muted">
-            Aucun équipement trouvé pour ce laboratoire.
+          <div v-if="filteredEquipements.length === 0" class="col-12 text-center text-muted p-5">
+            <i class="fas fa-box-open fa-3x mb-3"></i>
+            <p>Aucun équipement trouvé pour cette sélection.</p>
           </div>
         </div>
       </div>
@@ -143,12 +128,15 @@
             <dl class="row">
               <dt class="col-sm-4">Nom:</dt>
               <dd class="col-sm-8">{{ selectedEquip.nom }}</dd>
-               
+
               <dt class="col-sm-4">Description:</dt>
-              <dd class="col-sm-8">{{ selectedEquip.caracteristique }}</dd>
+              <dd class="col-sm-8">{{ selectedEquip.caracteristique || 'N/A' }}</dd>
 
               <dt class="col-sm-4">Laboratoire:</dt>
-              <dd class="col-sm-8">{{ getLaboNom(selectedEquip.laboratoire?.id) }}</dd>
+              <dd class="col-sm-8">{{ getLaboNom(selectedEquip.laboratoire?.id || selectedEquip.laboratoireId) }}</dd>
+
+              <dt class="col-sm-4">Département:</dt>
+              <dd class="col-sm-8">{{ getDeptNom(getDeptIdFromEquip(selectedEquip)) }}</dd>
 
               <dt class="col-sm-4">État:</dt>
               <dd class="col-sm-8">
@@ -156,11 +144,11 @@
               </dd>
 
               <dt class="col-sm-4">Date acquisition:</dt>
-              <dd class="col-sm-8">{{ selectedEquip.dateAcquisition }}</dd>
+              <dd class="col-sm-8">{{ selectedEquip.dateAcquisition || 'N/A' }}</dd>
 
               <dt class="col-sm-4" v-if="selectedEquip.imageUrl">Image:</dt>
               <dd class="col-sm-8" v-if="selectedEquip.imageUrl">
-                <img :src="selectedEquip.imageUrl" alt="Image équipement" class="equip-image" />
+                <img :src="selectedEquip.imageUrl" alt="Image équipement" class="equip-image-large" />
               </dd>
             </dl>
           </div>
@@ -178,127 +166,102 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getLaboratoires } from '@/Service/LaboratoireService'
-import { getEquipementsByLabo } from '@/Service/EquipementService'
-import { getActiveDepartements } from '@/Service/departementService'
-import ReclamationService from '@/Service/ReclamationService'
+import { getEquipements } from '@/Service/EquipementService'
+import { getDepartements } from '@/Service/departementService'
 import type { Equipement, Laboratoire, Departement } from '@/types'
 
 const router = useRouter()
 const equipements = ref<Equipement[]>([])
 const laboratoires = ref<Laboratoire[]>([])
 const departements = ref<Departement[]>([])
-const reclamationsEnCours = ref<any[]>([])
 const selectedDepartement = ref<number | ''>('')
 const selectedLaboratoire = ref<number | ''>('')
 const showDetailsModal = ref(false)
 const selectedEquip = ref<Equipement | null>(null)
 const loading = ref(false)
 
+// Charger les données au montage
 onMounted(async () => {
+  loading.value = true
   try {
     // Charger tous les départements
-    const resDepts = await getActiveDepartements()
+    const resDepts = await getDepartements()
     departements.value = Array.isArray(resDepts.data) ? resDepts.data : []
 
     // Charger tous les laboratoires
     const resLabos = await getLaboratoires()
     laboratoires.value = Array.isArray(resLabos.data) ? resLabos.data : []
 
-    // Charger les réclamations en cours de l'étudiant
-    try {
-      const resRec = await ReclamationService.getReclamationsEtudiantConnecte()
-      reclamationsEnCours.value = (resRec.data || []).filter((r: any) => 
-        r.etat === 'NON_TRAITEE' || r.statut === 'NON_TRAITEE' || r.statut === 'EN_COURS'
-      )
-    } catch (e) {
-      console.warn('Erreur chargement réclamations:', e)
-      reclamationsEnCours.value = []
-    }
+    // Charger tous les équipements
+    const resEquips = await getEquipements()
+    equipements.value = Array.isArray(resEquips.data) ? resEquips.data : []
+
+    console.log('Départements chargés:', departements.value)
+    console.log('Laboratoires chargés:', laboratoires.value)
+    console.log('Équipements chargés:', equipements.value)
   } catch (err) {
-    console.error(err)
-    alert('Impossible de charger les données.')
+    console.error('Erreur chargement données:', err)
+  } finally {
+    loading.value = false
   }
 })
 
 // Laboratoires filtrés par département sélectionné
 const filteredLaboratoires = computed(() => {
-  if (!selectedDepartement.value) return []
-  return laboratoires.value.filter(labo => 
-    labo.departement?.id === selectedDepartement.value || 
-    (labo as any).departementId === selectedDepartement.value
+  if (!selectedDepartement.value) return laboratoires.value
+  return laboratoires.value.filter(labo =>
+    labo.departement?.id === selectedDepartement.value ||
+    labo.departementId === selectedDepartement.value
   )
 })
 
 // Équipements filtrés par laboratoire sélectionné (ou tous les labos du département)
 const filteredEquipements = computed(() => {
-  if (!selectedDepartement.value) return []
-  
+  let result = equipements.value
+
+  if (selectedDepartement.value) {
+    result = result.filter(e => {
+      const laboId = e.laboratoire?.id || e.laboratoireId
+      if (!laboId) return false
+      const labo = laboratoires.value.find(l => l.id === laboId)
+      const deptId = labo?.departement?.id || labo?.departementId
+      return deptId === selectedDepartement.value
+    })
+  }
+
   if (selectedLaboratoire.value) {
-    return equipements.value.filter(e => 
-      (e.laboratoire?.id === selectedLaboratoire.value) || 
-      ((e as any).laboratoireId === selectedLaboratoire.value)
+    result = result.filter(e =>
+      e.laboratoire?.id === selectedLaboratoire.value ||
+      e.laboratoireId === selectedLaboratoire.value
     )
   }
-  
-  return equipements.value
+
+  return result
 })
 
 // Quand le département change
-async function onDepartementChange() {
+function onDepartementChange() {
   selectedLaboratoire.value = ''
-  equipements.value = []
-  
-  if (!selectedDepartement.value) return
-  
-  await loadEquipementsForDepartement()
 }
 
-// Charger tous les équipements des labos du département
-async function loadEquipementsForDepartement() {
-  loading.value = true
-  equipements.value = []
-  
-  const labosOfDept = filteredLaboratoires.value
-  
-  for (const labo of labosOfDept) {
-    try {
-      const resEquip = await getEquipementsByLabo(labo.id)
-      if (Array.isArray(resEquip.data)) {
-        const normalized = resEquip.data.map((e: any) => {
-          let imgUrl = e.imageUrl || e.image_url || e.imageURL || e.img || null
-          if (imgUrl && !imgUrl.startsWith('http')) {
-            imgUrl = 'http://localhost:8085' + (imgUrl.startsWith('/') ? '' : '/') + imgUrl
-          }
-          return { ...e, imageUrl: imgUrl }
-        })
-        equipements.value.push(...normalized)
-      }
-    } catch (e) {
-      console.warn(`Erreur chargement equipements labo ${labo.id}`, e)
-    }
-  }
-  
-  loading.value = false
+function getDeptIdFromEquip(equip?: Equipement | null): number | undefined {
+  if (!equip) return undefined
+  const laboId = equip.laboratoire?.id || equip.laboratoireId
+  if (!laboId) return undefined
+  const labo = laboratoires.value.find(l => l.id === laboId)
+  return labo?.departement?.id || labo?.departementId
 }
 
 function getLaboNom(id?: number) {
   if (!id) return 'N/A'
   const labo = laboratoires.value.find(l => l.id === id)
-  return labo ? labo.nomLabo : 'N/A'
+  return labo ? (labo.nomLabo || labo.nom) : 'N/A'
 }
 
-// Générer un identifiant pour l'équipement
-function generateIdentifiant(equip: Equipement): string {
-  const prefix = (equip.nom || 'EQ').substring(0, 3).toUpperCase()
-  return `${prefix}-${String(equip.id).padStart(4, '0')}`
-}
-
-// Gérer les erreurs de chargement d'image
-function handleImageError(event: Event) {
-  const img = event.target as HTMLImageElement
-  console.warn('Erreur chargement image:', img.src)
-  // Cacher l'image cassée
-  img.style.display = 'none'
+function getDeptNom(id?: number | '') {
+  if (!id) return 'N/A'
+  const dept = departements.value.find(d => d.id === id)
+  return dept ? dept.nom : 'N/A'
 }
 
 function getCardClass(etat: string) {
@@ -326,7 +289,6 @@ function formatEtat(etat: string) {
     EN_MAINTENANCE: 'En maintenance'
   }
   return labels[etat] || etat
-                                                                                                                                                                                                                                                                                          
 }
 
 function showDetails(equip: Equipement) {
@@ -334,42 +296,34 @@ function showDetails(equip: Equipement) {
   showDetailsModal.value = true
 }
 
-// Vérifie si l'équipement a déjà une réclamation en cours
-function hasReclamationEnCours(equip: Equipement): boolean {
-  return reclamationsEnCours.value.some((r: any) => 
-    r.equipementId === equip.id || r.equipement?.id === equip.id
-  )
-}
-
 // Vérifie si on peut réclamer cet équipement
+// On peut toujours réclamer un équipement (même fonctionnel)
 function canReclamer(equip: Equipement): boolean {
-  // Ne peut pas réclamer si une réclamation est déjà en cours
-  if (hasReclamationEnCours(equip)) return false
   return true
 }
 
 // Tooltip pour le bouton réclamer
 function getReclamationTooltip(equip: Equipement): string {
-  if (hasReclamationEnCours(equip)) return 'Une réclamation est déjà en cours pour cet équipement'
   return 'Signaler un problème avec cet équipement'
 }
 
 // Texte du bouton réclamer
 function getReclamationButtonText(equip: Equipement): string {
-  if (hasReclamationEnCours(equip)) return 'Réclamation en cours'
   return 'Réclamer'
 }
 
 // Rediriger vers le formulaire de réclamation avec l'équipement pré-sélectionné
 function goToReclamation(equip: Equipement) {
-  const labo = laboratoires.value.find(l => l.id === equip.laboratoire?.id)
+  if (!canReclamer(equip)) return
+  
+  const laboId = equip.laboratoire?.id || equip.laboratoireId
   router.push({ 
     path: '/etudiant/nouvelle-reclamation', 
     query: { 
       equipementId: equip.id, 
       equipementNom: equip.nom,
-      laboratoireId: equip.laboratoire?.id,
-      laboratoireNom: labo?.nomLabo || ''
+      laboratoireId: laboId,
+      laboratoireNom: getLaboNom(laboId)
     } 
   })
 }
@@ -387,16 +341,12 @@ function goToReclamation(equip: Equipement) {
   border: 1px solid #ddd;
   margin-bottom: 10px;
 }
-.equip-image-placeholder {
-  width: 100px;
-  height: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f8f9fa;
-  border: 2px dashed #dee2e6;
-  border-radius: 5px;
-  margin: 0 auto 10px auto;
+.equip-image-large {
+  max-width: 200px;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #ddd;
 }
 .card-title, 
 .modal-body dt {

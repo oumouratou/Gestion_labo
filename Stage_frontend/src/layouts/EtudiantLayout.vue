@@ -172,7 +172,7 @@ const pageTitle = computed(() => {
     '/etudiant/reservations': 'Mes réservations',
     '/etudiant/nouvelle-reservation': 'Nouvelle réservation',
     '/etudiant/reclamations': 'Mes réclamations',
-    '/etudiant/NouvelleReclamation': 'Nouvelle réclamation',
+    '/etudiant/nouvelle-reclamation': 'Nouvelle réclamation',
     '/etudiant/profil': 'Mon Profil'
   }
   return titles[route.path] || 'Tableau de bord'

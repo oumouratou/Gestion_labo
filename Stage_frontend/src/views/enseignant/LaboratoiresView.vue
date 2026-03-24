@@ -118,15 +118,15 @@
               <table class="table table-striped table-hover">
                 <thead>
                   <tr>
-                    <th>ID</th>
+                    <th>Numéro</th>
                     <th>Nom</th>
                     <th>État</th>
                     <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="equip in selectedLabo.equipements" :key="equip.id">
-                    <td>{{ equip.id }}</td>
+                  <tr v-for="(equip, index) in selectedLabo.equipements" :key="equip.id">
+                    <td>{{ Number(index) + 1 }}</td>
                     <td>{{ equip.nom }}</td>
                     <td>
                       <span :class="getEquipEtatBadge(equip.etat)">

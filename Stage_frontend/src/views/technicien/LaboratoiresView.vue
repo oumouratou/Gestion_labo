@@ -40,7 +40,7 @@
             <table class="table table-bordered table-hover">
               <thead class="thead-light">
                 <tr>
-                  <th>N°</th>
+                  <th>Numéro</th>
                   <th>Nom du labo</th>
                   <th>Département</th>
                   <th>État</th>
@@ -52,7 +52,7 @@
                 <tr v-for="(labo, index) in labosFiltres" :key="labo.id">
                   <td>{{ index + 1 }}</td>
                   <td>{{ labo.nomLabo }}</td>
-                  <td>{{ labo.departement?.nom || '—' }}</td>
+                  <td>{{ labo.departement?.nom || '' }}</td>
                   <td>
                     <span :class="labo.etatLabo === 'ACTIF' ? 'badge badge-success' : 'badge badge-secondary'">
                       {{ labo.etatLabo }}
@@ -225,9 +225,9 @@ function openModal(labo?: Laboratoire) {
   if (labo) {
     isEdit.value = true
     editId.value = labo.id
-    form.nomLabo = labo.nomLabo || labo.nom || ''
+    form.nomLabo = labo.nomLabo ?? ''
     form.departementId = labo.departement?.id || ''
-    form.etatLabo = labo.etatLabo || ''
+    form.etatLabo = labo.etatLabo ?? ''
   } else {
     isEdit.value = false
     editId.value = null

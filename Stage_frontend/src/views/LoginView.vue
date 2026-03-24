@@ -43,7 +43,7 @@
       </div>
       <div class="brand-footer">
         <div class="footer-line"></div>
-        <p><i class="fas fa-university mr-2"></i>ISET Djerba © 2026 — LabManager v2.0</p>
+        <p><i class="fas fa-university mr-2"></i>ISET Djerba © 2026  LabManager v2.0</p>
       </div>
     </div>
 
@@ -74,38 +74,53 @@
           </div>
 
           <form v-if="!resetPasswordSuccess" @submit.prevent="handleResetPassword" class="auth-form">
-            <div class="input-group">
-              <label for="newPassword">Nouveau mot de passe</label>
-              <div class="input-wrapper">
-                <i class="fas fa-lock"></i>
-                <input 
-                  :type="showNewPassword ? 'text' : 'password'" 
-                  id="newPassword" 
-                  v-model="resetPasswordForm.newPassword"
-                  placeholder="Minimum 6 caractères"
-                  required
-                >
-                <button type="button" class="toggle-password" @click="showNewPassword = !showNewPassword">
-                  <i :class="showNewPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
-                </button>
-              </div>
-            </div>
-
-            <div class="input-group">
-              <label for="confirmNewPassword">Confirmer le mot de passe</label>
-              <div class="input-wrapper">
-                <i class="fas fa-lock"></i>
-                <input 
-                  :type="showConfirmNewPassword ? 'text' : 'password'" 
-                  id="confirmNewPassword" 
-                  v-model="resetPasswordForm.confirmPassword"
-                  placeholder="Retapez le mot de passe"
-                  required
-                >
-                <button type="button" class="toggle-password" @click="showConfirmNewPassword = !showConfirmNewPassword">
-                  <i :class="showConfirmNewPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
-                </button>
-              </div>
+            <div class="register-table-container">
+              <table class="register-table login-table">
+                <tbody>
+                  <tr>
+                    <td class="field-label">
+                      <label for="newPassword">
+                        <i class="fas fa-lock"></i> Nouveau mot de passe
+                      </label>
+                    </td>
+                    <td class="field-input">
+                      <div class="table-input-wrapper password-field" :class="{ valid: resetPasswordForm.newPassword.length >= 6 }">
+                        <input
+                          :type="showNewPassword ? 'text' : 'password'"
+                          id="newPassword"
+                          v-model="resetPasswordForm.newPassword"
+                          placeholder="Minimum 6 caractères"
+                          required
+                        >
+                        <button type="button" class="toggle-password" @click="showNewPassword = !showNewPassword">
+                          <i :class="showNewPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="field-label">
+                      <label for="confirmNewPassword">
+                        <i class="fas fa-lock"></i> Confirmer le mot de passe
+                      </label>
+                    </td>
+                    <td class="field-input">
+                      <div class="table-input-wrapper password-field" :class="{ valid: resetPasswordForm.confirmPassword && resetPasswordForm.confirmPassword === resetPasswordForm.newPassword, error: resetPasswordForm.confirmPassword && resetPasswordForm.confirmPassword !== resetPasswordForm.newPassword }">
+                        <input
+                          :type="showConfirmNewPassword ? 'text' : 'password'"
+                          id="confirmNewPassword"
+                          v-model="resetPasswordForm.confirmPassword"
+                          placeholder="Retapez le mot de passe"
+                          required
+                        >
+                        <button type="button" class="toggle-password" @click="showConfirmNewPassword = !showConfirmNewPassword">
+                          <i :class="showConfirmNewPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
             <button type="submit" class="submit-btn" :disabled="resetPasswordLoading">
@@ -200,7 +215,7 @@
                           :type="showPassword ? 'text' : 'password'" 
                           id="loginPassword" 
                           v-model="loginForm.password"
-                          placeholder="••••••••"
+                          placeholder="⬢⬢⬢⬢⬢⬢⬢⬢"
                           required
                         >
                         <button type="button" class="toggle-password" @click="showPassword = !showPassword">
@@ -501,14 +516,119 @@
                     <div class="table-input-wrapper select-field" :class="{ valid: registerForm.role }">
                       <select id="registerRole" v-model="registerForm.role" required @change="onRoleChange">
                         <option value="" disabled>Sélectionnez votre rôle</option>
-                        <option value="ETUDIANT">🎓 Étudiant</option>
-                        <option value="ENSEIGNANT">👨‍🏫 Enseignant</option>
-                        <option value="TECHNICIEN">🔧 Technicien</option>
+                        <option value="ETUDIANT">x} Étudiant</option>
+                        <option value="ENSEIGNANT">x⬍x Enseignant</option>
+                        <option value="TECHNICIEN">x Technicien</option>
                       </select>
                       <i v-if="registerForm.role" class="fas fa-check-circle valid-icon"></i>
                     </div>
                   </td>
                 </tr>
+
+                <!-- Département (juste après le rôle, désactivé pour les techniciens) -->
+                <tr>
+                  <td class="field-label" :class="{ 'disabled-label': registerForm.role === 'TECHNICIEN' }">
+                    <label for="registerDepartement">
+                      <i class="fas fa-building"></i> Département
+                      <span v-if="registerForm.role !== 'TECHNICIEN'" class="required">*</span>
+                    </label>
+                  </td>
+                  <td class="field-input">
+                    <div
+                      class="table-input-wrapper select-field"
+                      :class="{
+                        valid: registerForm.departementId && registerForm.role !== 'TECHNICIEN',
+                        disabled: registerForm.role === 'TECHNICIEN'
+                      }"
+                    >
+                      <select
+                        id="registerDepartement"
+                        v-model="registerForm.departementId"
+                        :required="registerForm.role !== 'TECHNICIEN'"
+                        :disabled="registerForm.role === 'TECHNICIEN' || loadingDepartements || departementsError"
+                        @change="onDepartementChange"
+                      >
+                        <option value="" disabled>
+                          {{ registerForm.role === 'TECHNICIEN' ? 'Non applicable pour les techniciens' : (loadingDepartements ? 'Chargement...' : (departementsError ? 'Erreur de chargement' : (departements.length === 0 ? 'Aucun département' : 'Sélectionnez votre département'))) }}
+                        </option>
+                        <option
+                          v-for="dept in departements"
+                          :key="dept.id"
+                          :value="dept.id"
+                        >
+                          {{ dept.nom }}
+                        </option>
+                      </select>
+                      <button
+                        v-if="(departementsError || (departements.length === 0 && !loadingDepartements)) && registerForm.role !== 'TECHNICIEN'"
+                        type="button"
+                        class="reload-btn"
+                        @click.prevent="loadDepartements(0)"
+                        title="Recharger les départements"
+                      >
+                        <i class="fas fa-sync-alt"></i>
+                      </button>
+                      <i v-if="registerForm.departementId && registerForm.role !== 'TECHNICIEN'" class="fas fa-check-circle valid-icon"></i>
+                    </div>
+                    <small v-if="registerForm.role === 'TECHNICIEN'" class="info-text">
+                      <i class="fas fa-info-circle"></i> Les techniciens n'appartiennent pas à un département
+                    </small>
+                  </td>
+                </tr>
+
+                <!-- Champs spécifiques Étudiant -->
+                <tr v-if="registerForm.role === 'ETUDIANT'">
+                  <td class="field-label">
+                    <label for="registerNiveau">
+                      <i class="fas fa-layer-group"></i> Niveau <span class="required">*</span>
+                    </label>
+                  </td>
+                  <td class="field-input">
+                    <div class="table-input-wrapper select-field" :class="{ valid: registerForm.niveau }">
+                      <select
+                        id="registerNiveau"
+                        v-model="registerForm.niveau"
+                        :disabled="!registerForm.departementId"
+                        @change="onNiveauChange"
+                        required
+                      >
+                        <option value="" disabled>
+                          {{ registerForm.departementId ? 'Sélectionnez un niveau' : 'Sélectionnez d\'abord un département' }}
+                        </option>
+                        <option v-for="opt in niveauOptions" :key="opt.value" :value="opt.value">
+                          {{ opt.label }}
+                        </option>
+                      </select>
+                      <i v-if="registerForm.niveau" class="fas fa-check-circle valid-icon"></i>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="registerForm.role === 'ETUDIANT'">
+                  <td class="field-label">
+                    <label for="registerClasse">
+                      <i class="fas fa-users"></i> Classe <span class="required">*</span>
+                    </label>
+                  </td>
+                  <td class="field-input">
+                    <div class="table-input-wrapper select-field" :class="{ valid: registerForm.classe }">
+                      <select
+                        id="registerClasse"
+                        v-model="registerForm.classe"
+                        :disabled="!registerForm.niveau"
+                        required
+                      >
+                        <option value="" disabled>
+                          {{ registerForm.niveau ? 'Sélectionnez une classe' : 'Sélectionnez d\'abord un niveau' }}
+                        </option>
+                        <option v-for="opt in classeOptions" :key="opt.value" :value="opt.value">
+                          {{ opt.label }}
+                        </option>
+                      </select>
+                      <i v-if="registerForm.classe" class="fas fa-check-circle valid-icon"></i>
+                    </div>
+                  </td>
+                </tr>
+
                 <!-- Option Chef de département (visible seulement pour les enseignants) -->
                 <tr v-if="registerForm.role === 'ENSEIGNANT'">
                   <td class="field-label">
@@ -528,55 +648,6 @@
                         <span class="chef-label">Je suis chef de département</span>
                       </label>
                     </div>
-                  </td>
-                </tr>
-                <!-- Département (désactivé pour les techniciens) -->
-                <tr>
-                  <td class="field-label" :class="{ 'disabled-label': registerForm.role === 'TECHNICIEN' }">
-                    <label for="registerDepartement">
-                      <i class="fas fa-building"></i> Département 
-                      <span v-if="registerForm.role !== 'TECHNICIEN'" class="required">*</span>
-                    </label>
-                  </td>
-                  <td class="field-input">
-                    <div 
-                      class="table-input-wrapper select-field" 
-                      :class="{ 
-                        valid: registerForm.departementId && registerForm.role !== 'TECHNICIEN',
-                        disabled: registerForm.role === 'TECHNICIEN'
-                      }"
-                    >
-                      <select 
-                        id="registerDepartement" 
-                        v-model="registerForm.departementId" 
-                        :required="registerForm.role !== 'TECHNICIEN'"
-                        :disabled="registerForm.role === 'TECHNICIEN' || loadingDepartements || departementsError"
-                      >
-                        <option value="" disabled>
-                          {{ registerForm.role === 'TECHNICIEN' ? 'Non applicable pour les techniciens' : (loadingDepartements ? 'Chargement...' : (departementsError ? 'Erreur de chargement' : (departements.length === 0 ? 'Aucun département' : 'Sélectionnez votre département'))) }}
-                        </option>
-                        <option 
-                          v-for="dept in departements" 
-                          :key="dept.id" 
-                          :value="dept.id"
-                        >
-                          {{ dept.nom }}
-                        </option>
-                      </select>
-                      <button 
-                        v-if="(departementsError || (departements.length === 0 && !loadingDepartements)) && registerForm.role !== 'TECHNICIEN'" 
-                        type="button" 
-                        class="reload-btn"
-                        @click.prevent="loadDepartements(0)"
-                        title="Recharger les départements"
-                      >
-                        <i class="fas fa-sync-alt"></i>
-                      </button>
-                      <i v-if="registerForm.departementId && registerForm.role !== 'TECHNICIEN'" class="fas fa-check-circle valid-icon"></i>
-                    </div>
-                    <small v-if="registerForm.role === 'TECHNICIEN'" class="info-text">
-                      <i class="fas fa-info-circle"></i> Les techniciens n'appartiennent pas à un département
-                    </small>
                   </td>
                 </tr>
               </tbody>
@@ -672,7 +743,77 @@ const registerForm = reactive({
   cin: '',
   role: '' as 'ETUDIANT' | 'ENSEIGNANT' | 'TECHNICIEN' | '',
   departementId: '' as number | '',
-  isChefDepartement: false
+  isChefDepartement: false,
+  // Champs spécifiques aux étudiants
+  niveau: '',
+  classe: ''
+})
+
+type OptionItem = { value: string; label: string }
+
+const LICENCE_LEVELS: OptionItem[] = [
+  { value: 'LICENCE1', label: 'Licence 1' },
+  { value: 'LICENCE2', label: 'Licence 2' },
+  { value: 'LICENCE3', label: 'Licence 3' },
+]
+
+const DEPT_CLASS_RULES: Record<string, Record<string, string[]>> = {
+  TI: {
+    LICENCE1: ['TI1', 'TI2', 'TI3', 'TI4', 'TI5'],
+    LICENCE2: ['DSI', 'MDW'],
+    LICENCE3: ['DSI', 'MDW'],
+  },
+  GE: {
+    LICENCE1: ['GE1', 'GE2', 'GE3', 'GE4', 'GE5'],
+    LICENCE2: ['EI', 'AII'],
+    LICENCE3: ['EI', 'AII'],
+  },
+  GM: {
+    LICENCE1: ['GM1', 'GM2', 'GM3', 'GM4', 'GM5'],
+    LICENCE2: ['MT'],
+    LICENCE3: ['MT'],
+  },
+  SEG: {
+    LICENCE1: ['MA1', 'MA2', 'MA3', 'MA4', 'MA5', 'CD1', 'CD2', 'CD3', 'CD4', 'CD5'],
+    LICENCE2: ['MA', 'DM'],
+    LICENCE3: ['MA', 'DM'],
+  },
+}
+
+function normalizeText(value: string): string {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
+function getDeptKey(departementNom?: string): 'TI' | 'GE' | 'GM' | 'SEG' | null {
+  const n = normalizeText(departementNom || '')
+  if ((n.includes('technologie') && n.includes('informatique')) || n.includes('informatique')) return 'TI'
+  if (n.includes('genie') && n.includes('electrique')) return 'GE'
+  if (n.includes('genie') && n.includes('mecanique')) return 'GM'
+  if ((n.includes('sciences') && n.includes('economiques') && n.includes('gestion')) || (n.includes('economie') && n.includes('gestion'))) return 'SEG'
+  return null
+}
+
+const selectedDepartement = computed(() => {
+  const id = Number(registerForm.departementId)
+  if (!Number.isFinite(id) || id <= 0) return null
+  return departements.value.find(d => Number(d.id) === id) || null
+})
+
+const niveauOptions = computed<OptionItem[]>(() => {
+  if (registerForm.role !== 'ETUDIANT') return []
+  const deptKey = getDeptKey(selectedDepartement.value?.nom)
+  return deptKey ? LICENCE_LEVELS : []
+})
+
+const classeOptions = computed<OptionItem[]>(() => {
+  if (registerForm.role !== 'ETUDIANT') return []
+  const deptKey = getDeptKey(selectedDepartement.value?.nom)
+  if (!deptKey) return []
+  const classes = DEPT_CLASS_RULES[deptKey]?.[registerForm.niveau] || []
+  return classes.map(c => ({ value: c, label: c }))
 })
 
 const confirmPassword = ref('')
@@ -726,10 +867,26 @@ function onRoleChange() {
     // Les techniciens n'ont pas de département
     registerForm.departementId = ''
     registerForm.isChefDepartement = false
+    registerForm.niveau = ''
+    registerForm.classe = ''
   } else if (registerForm.role !== 'ENSEIGNANT') {
     // Seuls les enseignants peuvent être chefs de département
     registerForm.isChefDepartement = false
   }
+
+  if (registerForm.role !== 'ETUDIANT') {
+    registerForm.niveau = ''
+    registerForm.classe = ''
+  }
+}
+
+function onDepartementChange() {
+  registerForm.niveau = ''
+  registerForm.classe = ''
+}
+
+function onNiveauChange() {
+  registerForm.classe = ''
 }
 
 // Validation globale du formulaire
@@ -746,6 +903,11 @@ const isFormValid = computed(() => {
   if (registerForm.role === 'TECHNICIEN') {
     return baseValid
   }
+
+  // Étudiants: exiger niveau + classe
+  if (registerForm.role === 'ETUDIANT') {
+    return baseValid && registerForm.departementId && registerForm.niveau && registerForm.classe
+  }
   
   return baseValid && registerForm.departementId
 })
@@ -753,8 +915,12 @@ const isFormValid = computed(() => {
 // Pourcentage de progression du formulaire
 const progressPercentage = computed(() => {
   let completed = 0
-  // Total = 7 pour technicien (pas de département), 8 pour les autres
-  const total = registerForm.role === 'TECHNICIEN' ? 7 : 8
+  // Total = 7 pour technicien (pas de département), 8 pour enseignant, 10 pour étudiant (niveau+classe)
+  const total = registerForm.role === 'TECHNICIEN'
+    ? 7
+    : registerForm.role === 'ETUDIANT'
+      ? 10
+      : 8
 
   if (registerForm.nom) completed++
   if (registerForm.prenom) completed++
@@ -765,6 +931,10 @@ const progressPercentage = computed(() => {
   if (registerForm.role) completed++
   // Département seulement si pas technicien
   if (registerForm.role !== 'TECHNICIEN' && registerForm.departementId) completed++
+
+  // Étudiant seulement
+  if (registerForm.role === 'ETUDIANT' && registerForm.niveau) completed++
+  if (registerForm.role === 'ETUDIANT' && registerForm.classe) completed++
 
   return Math.round((completed / total) * 100)
 })
@@ -785,8 +955,8 @@ async function loadDepartements(retryCount = 0) {
       // Essayer de récupérer les départements d'un format différent
       const keys = Object.keys(response.data)
       const firstKey = keys[0]
-      if (firstKey && Array.isArray(response.data[firstKey])) {
-        departements.value = response.data[firstKey]
+      if (firstKey && Array.isArray((response.data as any)[firstKey])) {
+        departements.value = (response.data as any)[firstKey]
       } else {
         departements.value = []
       }
@@ -859,8 +1029,12 @@ async function handleRegister() {
     return
   }
 
-  // Préparer les données d'inscription
-  const registrationData: any = {
+  if (registerForm.role === 'ETUDIANT' && (!registerForm.niveau || !registerForm.classe)) {
+    alert('Veuillez renseigner le niveau et la classe')
+    return
+  }
+
+  const baseFields = {
     nom: registerForm.nom.trim(),
     prenom: registerForm.prenom.trim(),
     email: registerForm.email.trim().toLowerCase(),
@@ -868,23 +1042,48 @@ async function handleRegister() {
     cin: registerForm.cin.trim(),
     role: registerForm.role
   }
-  
-  // Ajouter le département seulement si ce n'est pas un technicien
-  if (registerForm.role !== 'TECHNICIEN' && registerForm.departementId) {
-    registrationData.departementId = Number(registerForm.departementId)
+
+  // Pour ETUDIANT: envoyer en multipart/form-data + fichier `attestation`
+  let payload: any = baseFields
+  if (registerForm.role === 'ETUDIANT') {
+    if (niveauOptions.value.length === 0) {
+      alert('Ce département étudiant n\'est pas pris en charge. Choisissez Technologie de l\'informatique, Génie électrique, Génie mécanique ou Sciences économiques et gestion.')
+      return
+    }
+    const niveauValide = niveauOptions.value.some(opt => opt.value === registerForm.niveau)
+    const classeValide = classeOptions.value.some(opt => opt.value === registerForm.classe)
+    if (!niveauValide || !classeValide) {
+      alert('Veuillez choisir un niveau et une classe valides pour le département sélectionné')
+      return
+    }
+
+    const fd = new FormData()
+    fd.append('nom', baseFields.nom)
+    fd.append('prenom', baseFields.prenom)
+    fd.append('email', baseFields.email)
+    fd.append('password', baseFields.password)
+    fd.append('cin', baseFields.cin)
+    fd.append('role', baseFields.role)
+    fd.append('departementId', String(registerForm.departementId))
+    fd.append('niveau', registerForm.niveau)
+    fd.append('classe', registerForm.classe)
+    payload = fd
   } else {
-    // Pour les techniciens, envoyer null explicitement (pas de département)
-    registrationData.departementId = null
-  }
-  
-  // Ajouter le flag chef de département pour les enseignants
-  if (registerForm.role === 'ENSEIGNANT' && registerForm.isChefDepartement) {
-    registrationData.isChefDepartement = true
+    // Ajouter le département seulement si ce n'est pas un technicien
+    if (registerForm.role !== 'TECHNICIEN' && registerForm.departementId) {
+      payload.departementId = Number(registerForm.departementId)
+    } else {
+      // Pour les techniciens, envoyer null explicitement (pas de département)
+      payload.departementId = null
+    }
+
+    // Ajouter le flag chef de département pour les enseignants
+    if (registerForm.role === 'ENSEIGNANT' && registerForm.isChefDepartement) {
+      payload.isChefDepartement = true
+    }
   }
 
-  console.log('Données d\'inscription envoyées:', registrationData) // Debug
-  
-  const success = await register(registrationData)
+  const success = await register(payload)
   
   if (success) {
     successMessage.value = 'Compte créé avec succès ! Redirection...'

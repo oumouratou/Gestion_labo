@@ -16,33 +16,33 @@ const laboratoires = ref<Laboratoire[]>([
 ])
 
 const equipements = ref<Equipement[]>([
-  { id: 1, nom: 'Ordinateur HP EliteDesk', description: 'PC de bureau haute performance', laboratoireId: 1, etat: 'fonctionnel', dateAcquisition: '2024-01-15' },
-  { id: 2, nom: 'Switch Cisco 24 ports', description: 'Switch réseau manageable', laboratoireId: 2, etat: 'fonctionnel', dateAcquisition: '2023-06-20' },
+  { id: 1, nom: 'Ordinateur HP EliteDesk', description: 'PC de bureau haute performance', laboratoireId: 1, etat: 'FONCTIONNEL', dateAcquisition: '2024-01-15' },
+  { id: 2, nom: 'Switch Cisco 24 ports', description: 'Switch réseau manageable', laboratoireId: 2, etat: 'FONCTIONNEL', dateAcquisition: '2023-06-20' },
   { id: 3, nom: 'Microscope Optique', description: 'Microscope haute résolution', laboratoireId: 3, etat: 'en_panne', dateAcquisition: '2022-09-10' },
-  { id: 4, nom: 'Spectromètre UV', description: 'Spectromètre UV-Visible', laboratoireId: 4, etat: 'en_maintenance', dateAcquisition: '2023-03-05' },
-  { id: 5, nom: 'Serveur Dell PowerEdge', description: 'Serveur rack haute disponibilité', laboratoireId: 2, etat: 'fonctionnel', dateAcquisition: '2024-02-28' }
+  { id: 4, nom: 'Spectromètre UV', description: 'Spectromètre UV-Visible', laboratoireId: 4, etat: 'EN_MAINTENANCE', dateAcquisition: '2023-03-05' },
+  { id: 5, nom: 'Serveur Dell PowerEdge', description: 'Serveur rack haute disponibilité', laboratoireId: 2, etat: 'FONCTIONNEL', dateAcquisition: '2024-02-28' }
 ])
 
 const reservations = ref<Reservation[]>([
-  { id: 1, etudiantId: 3, laboratoireId: 1, dateReservation: '2026-01-20', heureDebut: '08:00', heureFin: '10:00', statut: 'confirmee', motif: 'TP Développement Web' },
-  { id: 2, etudiantId: 3, laboratoireId: 2, dateReservation: '2026-01-22', heureDebut: '14:00', heureFin: '16:00', statut: 'en_attente', motif: 'Projet Réseaux' }
+  { id: 1, etudiantId: 3, laboratoireId: 1, dateReservation: '2026-01-20', heureDebut: '08:00', heureFin: '10:00', statut: 'APPROUVEE', motif: 'TP Développement Web' },
+  { id: 2, etudiantId: 3, laboratoireId: 2, dateReservation: '2026-01-22', heureDebut: '14:00', heureFin: '16:00', statut: 'EN_ATTENTE', motif: 'Projet Réseaux' }
 ])
 
 const reclamations = ref<Reclamation[]>([
-  { id: 1, enseignantId: 2, equipementId: 3, description: 'Le microscope ne fonctionne plus correctement, image floue', dateReclamation: '2026-01-15', statut: 'en_cours', priorite: 'haute' },
-  { id: 2, enseignantId: 2, equipementId: 4, description: 'Calibration nécessaire pour le spectromètre', dateReclamation: '2026-01-10', statut: 'en_attente', priorite: 'moyenne' }
+  { id: 1, titre: 'Microscope défectueux', enseignantId: 2, equipementId: 3, description: 'Le microscope ne fonctionne plus correctement, image floue', dateCreation: '2026-01-15', statut: 'EN_COURS', priorite: 'HAUTE' },
+  { id: 2, titre: 'Spectromètre à calibrer', enseignantId: 2, equipementId: 4, description: 'Calibration nécessaire pour le spectromètre', dateCreation: '2026-01-10', statut: 'NOUVELLE', priorite: 'MOYENNE' }
 ])
 
 const etudiants = ref<User[]>([
-  { id: 3, nom: 'Bernard', prenom: 'Lucas', email: 'lucas.bernard@univ.com', role: 'etudiant', departementId: 1 },
-  { id: 4, nom: 'Petit', prenom: 'Emma', email: 'emma.petit@univ.com', role: 'etudiant', departementId: 2 },
-  { id: 5, nom: 'Durand', prenom: 'Thomas', email: 'thomas.durand@univ.com', role: 'etudiant', departementId: 1 }
+  { id: 3, nom: 'Bernard', prenom: 'Lucas', email: 'lucas.bernard@univ.com', role: 'ETUDIANT', departementId: 1, niveau: 'L2', classe: 'Info-B' },
+  { id: 4, nom: 'Petit', prenom: 'Emma', email: 'emma.petit@univ.com', role: 'ETUDIANT', departementId: 2, niveau: 'L3', classe: 'Chimie-A' },
+  { id: 5, nom: 'Durand', prenom: 'Thomas', email: 'thomas.durand@univ.com', role: 'ETUDIANT', departementId: 1, niveau: 'M1', classe: 'Info-A' }
 ])
 
 const enseignants = ref<User[]>([
-  { id: 2, nom: 'Martin', prenom: 'Sophie', email: 'sophie.martin@univ.com', role: 'enseignant', departementId: 1 },
-  { id: 6, nom: 'Leroy', prenom: 'Pierre', email: 'pierre.leroy@univ.com', role: 'enseignant', departementId: 2 },
-  { id: 7, nom: 'Moreau', prenom: 'Claire', email: 'claire.moreau@univ.com', role: 'enseignant', departementId: 3 }
+  { id: 2, nom: 'Martin', prenom: 'Sophie', email: 'sophie.martin@univ.com', role: 'ENSEIGNANT', departementId: 1 },
+  { id: 6, nom: 'Leroy', prenom: 'Pierre', email: 'pierre.leroy@univ.com', role: 'ENSEIGNANT', departementId: 2 },
+  { id: 7, nom: 'Moreau', prenom: 'Claire', email: 'claire.moreau@univ.com', role: 'ENSEIGNANT', departementId: 3 }
 ])
 
 export function useData() {
@@ -123,7 +123,7 @@ export function useData() {
   }
 
   function cancelReservation(id: number) {
-    updateReservation(id, { statut: 'annulee' })
+    updateReservation(id, { statut: 'REFUSEE' })
   }
 
   // CRUD Réclamations
@@ -148,7 +148,7 @@ export function useData() {
   // CRUD Étudiants
   function addEtudiant(etud: Omit<User, 'id'>) {
     const newId = Math.max(...etudiants.value.map(e => e.id), 0) + 1
-    etudiants.value.push({ ...etud, id: newId, role: 'etudiant' })
+    etudiants.value.push({ ...etud, id: newId, role: 'ETUDIANT' })
   }
 
   function updateEtudiant(id: number, data: Partial<User>) {
@@ -168,7 +168,7 @@ export function useData() {
   // CRUD Enseignants
   function addEnseignant(ens: Omit<User, 'id'>) {
     const newId = Math.max(...enseignants.value.map(e => e.id), 0) + 1
-    enseignants.value.push({ ...ens, id: newId, role: 'enseignant' })
+    enseignants.value.push({ ...ens, id: newId, role: 'ENSEIGNANT' })
   }
 
   function updateEnseignant(id: number, data: Partial<User>) {

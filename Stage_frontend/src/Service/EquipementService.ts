@@ -1,17 +1,4 @@
-import axios from "axios"
-
-// Base axios pour les équipements
-const api = axios.create({
-  baseURL: "http://localhost:8085/api",
-  headers: { "Content-Type": "application/json" }
-})
-
-// Ajouter automatiquement le token JWT à chaque requête
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem("token")
-  if (token) config.headers!["Authorization"] = `Bearer ${token}`
-  return config
-})
+import api from './api'
 
 // Récupérer tous les équipements
 export const getEquipements = () => api.get('/equipements')

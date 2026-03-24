@@ -48,7 +48,7 @@
           <table class="table table-bordered table-hover">
             <thead class="bg-info">
               <tr>
-                <th>N°</th>
+                <th>Numéro</th>
                 <th>Nom</th>
                 <th>Prénom</th>
                 <th>Email</th>
@@ -69,10 +69,7 @@
                 <td>{{ formatDate(ens.createdAt) }}</td>
                 <td class="text-center">
                   <div class="d-flex justify-content-center gap-2">
-                    <button 
-                      class="btn btn-info btn-sm" 
-                      @click="openAlertModal(ens)"
-                    >
+                    <button class="btn btn-warning btn-sm" @click="handleAlerter(ens)">
                       <i class="fas fa-bell mr-1"></i>Alerter
                     </button>
                   </div>
@@ -186,28 +183,27 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue';
-import { getUsers, createEnseignant, updateEnseignant, deleteUser } from '@/Service/UserService';
+import { getUsers, createEnseignant, updateEnseignant } from '@/Service/UserService';
 import { getDepartements } from '@/Service/departementService';
-import { sendAlertToUser } from '@/Service/NotificationService';
+import { sendAlerteEnseignant } from '@/Service/NotificationService';
 
-interface DepartementOption {
-  id: number;
-  nom: string;
+interface Departement {
+  id: number
+  nom: string
 }
 
-interface EnseignantRow {
-  id: number;
-  nom: string;
-  prenom: string;
-  email: string;
-  cin?: string;
-  role: string;
-  createdAt?: string | null;
-  departement?: { id: number; nom: string };
+interface Enseignant {
+  id: number
+  nom: string
+  prenom: string
+  email: string
+  cin: string
+  createdAt?: string | null
+  departement?: Departement
 }
 
-const enseignants = ref<EnseignantRow[]>([]);
-const departements = ref<DepartementOption[]>([]);
+const enseignants = ref<Enseignant[]>([]);
+const departements = ref<Departement[]>([]);
 const showModal = ref(false);
 const isEdit = ref(false);
 const editId = ref<number | null>(null);
@@ -223,13 +219,13 @@ const filteredEnseignants = computed(() => {
   
   // Filtre par département
   if (selectedDepartement.value) {
-    result = result.filter((e: any) => e.departement?.id === selectedDepartement.value);
+    result = result.filter(e => e.departement?.id === selectedDepartement.value);
   }
   
   // Filtre par recherche textuelle
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase().trim();
-    result = result.filter((e: any) => 
+    result = result.filter(e => 
       e.nom?.toLowerCase().includes(query) ||
       e.prenom?.toLowerCase().includes(query) ||
       e.cin?.toLowerCase().includes(query) ||
@@ -251,15 +247,14 @@ const form = reactive({
 
 async function loadEnseignants() {
   const res = await getUsers();
-  const rawData = Array.isArray(res.data) ? res.data : [];
-  const data = rawData.filter((u: EnseignantRow) => u.role === 'ENSEIGNANT');
+  const data = (res.data as any[]).filter(u => u.role === 'ENSEIGNANT');
   // Trier par ID décroissant (les plus récents en premier)
-  enseignants.value = data.sort((a: EnseignantRow, b: EnseignantRow) => b.id - a.id);
+  enseignants.value = data.sort((a: Enseignant, b: Enseignant) => b.id - a.id);
 }
 
 async function loadDepartements() {
   const res = await getDepartements();
-  departements.value = Array.isArray(res.data) ? res.data : [];
+  departements.value = res.data as Departement[];
 }
 
 function openModal(ens?: any) {
@@ -309,21 +304,24 @@ async function handleSubmit() {
   closeModal();
 }
 
-async function handleDelete(id: number) {
+async function handleAlerter(ens: Enseignant) {
+  const motif = prompt(`Message d'alerte pour ${ens.prenom} ${ens.nom} :`, 'Veuillez consulter vos réclamations et notifications.')
+  if (motif === null) return
+
+  const message = motif.trim()
+  if (!message) {
+    alert('Le message d\'alerte ne peut pas être vide.')
+    return
+  }
+
   try {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cet enseignant ?')) return;
-    await deleteUser(id);
-    await loadEnseignants();
+    await sendAlerteEnseignant(ens.id, message)
+    alert(`Notification envoyée à ${ens.prenom} ${ens.nom}.`)
   } catch (error: any) {
-    console.error('Erreur suppression:', error);
-    alert(
-      error.response?.data?.message ||
-      'Impossible de supprimer l\'enseignant. Vérifie le backend.'
-    );
+    console.error('Erreur envoi notification enseignant:', error)
+    alert(error.response?.data?.message || "R Impossible d'envoyer la notification à l'enseignant.")
   }
 }
-
-
 
 function formatDate(dateStr?: string | null) {
   if (!dateStr) return 'N/A';
@@ -345,7 +343,7 @@ function closeAlertModal() {
 async function sendAlert() {
   if (!alertTarget.value || !alertMessage.value.trim()) return;
   try {
-    await sendAlertToUser(alertTarget.value.id, alertMessage.value);
+    await sendAlerteEnseignant(alertTarget.value.id, alertMessage.value);
     alert('Alerte envoyée avec succès à ' + alertTarget.value.prenom + ' ' + alertTarget.value.nom);
     closeAlertModal();
   } catch (error: any) {

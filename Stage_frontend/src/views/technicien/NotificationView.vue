@@ -53,7 +53,7 @@
                   <td>
                     <span :class="typeBadge(notif.type)">
                       <i :class="typeIcon(notif.type)" class="mr-1"></i>
-                      {{ notif.type === 'RESERVATION' ? 'Réservation' : 'Réclamation' }}
+                      {{ typeLabel(notif.type) }}
                     </span>
                   </td>
                   <td>
@@ -153,7 +153,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getAllNotifications, markNotificationAsRead } from '@/Service/NotificationService'
-import api from '@/Service/api'
 
 interface NotificationDTO {
   id: number
@@ -241,14 +240,8 @@ function cleanMessage(message: string) {
 async function fetchNotifications() {
   try {
     console.log("Chargement des notifications...")
-    // Récupérer TOUTES les notifications du technicien (lues + non lues)
-    let res;
-    try {
-      res = await api.get('/notifications/technicien/all', { withCredentials: true })
-    } catch (e) {
-      // Fallback sur l'endpoint classique
-      res = await getAllNotifications()
-    }
+    // Récupérer l'historique complet (inclut ALERT/ALERTE)
+    const res = await getAllNotifications(true)
     console.log("Réponse brute notifications:", res)
     
     // Gérer les différents formats de réponse
@@ -286,6 +279,9 @@ function typeBadge(type: string) {
   switch (type) {
     case 'RESERVATION': return 'badge badge-success'
     case 'RECLAMATION': return 'badge badge-warning'
+    case 'ALERT':
+    case 'ALERTE': return 'badge badge-danger'
+    case 'INFO': return 'badge badge-info'
     default: return 'badge badge-secondary'
   }
 }
@@ -294,8 +290,20 @@ function typeIcon(type: string) {
   switch (type) {
     case 'RESERVATION': return 'fas fa-calendar-check'
     case 'RECLAMATION': return 'fas fa-exclamation-triangle'
+    case 'ALERT':
+    case 'ALERTE': return 'fas fa-bullhorn'
+    case 'INFO': return 'fas fa-info-circle'
     default: return 'fas fa-bell'
   }
+}
+
+function typeLabel(type: string) {
+  const upper = String(type || '').toUpperCase()
+  if (upper === 'RESERVATION') return 'Réservation'
+  if (upper === 'RECLAMATION') return 'Réclamation'
+  if (upper === 'ALERT' || upper === 'ALERTE') return 'Alerte'
+  if (upper === 'INFO') return 'Info'
+  return upper || 'Notification'
 }
 
 function formatDate(dateStr: string) {

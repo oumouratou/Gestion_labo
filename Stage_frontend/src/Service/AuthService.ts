@@ -1,19 +1,18 @@
-import api from '@/Service/api'
-
-const AUTH_BASE = '/auth'
+import api from './api'
 
 export default {
   register(user: any) {
-    return api.post(`${AUTH_BASE}/register`, user)
+    // Supporte JSON (application/json) et FormData (multipart/form-data)
+    if (typeof FormData !== 'undefined' && user instanceof FormData) {
+      return api.post('/auth/register', user, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+    }
+    return api.post('/auth/register', user)
   },
 
   login(credentials: { email: string; password: string }) {
-    const normalizedCredentials = {
-      email: credentials.email.trim().toLowerCase(),
-      password: credentials.password
-    }
-
-    return api.post(`${AUTH_BASE}/login`, normalizedCredentials).then(response => {
+    return api.post('/auth/login', credentials).then(response => {
       if (response.data.token) {
         localStorage.setItem('user', JSON.stringify(response.data))
         localStorage.setItem('token', response.data.token)
@@ -38,16 +37,16 @@ export default {
 
   // Demander la réinitialisation du mot de passe
   forgotPassword(email: string) {
-    return api.post(`${AUTH_BASE}/forgot-password`, { email: email.trim().toLowerCase() })
+    return api.post('/auth/forgot-password', { email })
   },
 
   // Réinitialiser le mot de passe avec le token
   resetPassword(token: string, newPassword: string) {
-    return api.post(`${AUTH_BASE}/reset-password`, { token, newPassword })
+    return api.post('/auth/reset-password', { token, newPassword })
   },
 
   // Vérifier si le token de réinitialisation est valide
   verifyResetToken(token: string) {
-    return api.get(`${AUTH_BASE}/verify-reset-token`, { params: { token } })
+    return api.get('/auth/verify-reset-token', { params: { token } })
   }
 }

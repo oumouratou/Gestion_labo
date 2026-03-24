@@ -28,7 +28,7 @@
                 <div class="form-group">
                   <label>Département</label>
                   <select class="form-control" v-model="selectedDepartement" @change="onDepartementChange">
-                    <option value="">-- Sélectionner un département --</option>
+                    <option value="">-- Tous les départements --</option>
                     <option v-for="dept in departements" :key="dept.id" :value="dept.id">
                       {{ dept.nom }}
                     </option>
@@ -40,7 +40,7 @@
               <div class="col-md-4">
                 <div class="form-group">
                   <label>Laboratoire</label>
-                  <select class="form-control" v-model="selectedLaboratoire" :disabled="!selectedDepartement">
+                  <select class="form-control" v-model="selectedLaboratoire">
                     <option value="">-- Tous les laboratoires --</option>
                     <option v-for="labo in filteredLaboratoires" :key="labo.id" :value="labo.id">
                       {{ labo.nomLabo || labo.nom }}
@@ -61,14 +61,8 @@
           </div>
         </div>
 
-        <!-- Message si aucun département sélectionné -->
-        <div v-if="!selectedDepartement" class="alert alert-info">
-          <i class="fas fa-info-circle mr-2"></i>
-          Veuillez sélectionner un département pour afficher les laboratoires et équipements.
-        </div>
-
         <!-- Loading -->
-        <div v-else-if="loading" class="text-center p-5">
+        <div v-if="loading" class="text-center p-5">
           <i class="fas fa-spinner fa-spin fa-2x"></i>
           <p class="mt-2">Chargement des équipements...</p>
         </div>
@@ -146,7 +140,7 @@
               <dd class="col-sm-8">{{ getLaboNom(selectedEquip.laboratoire?.id || selectedEquip.laboratoireId) }}</dd>
 
               <dt class="col-sm-4">Département:</dt>
-              <dd class="col-sm-8">{{ getDeptNom(selectedDepartement) }}</dd>
+              <dd class="col-sm-8">{{ getDeptNom(getDeptIdFromEquip(selectedEquip)) }}</dd>
 
               <dt class="col-sm-4">État:</dt>
               <dd class="col-sm-8">
@@ -173,11 +167,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getLaboratoires } from '@/Service/LaboratoireService'
-import { getEquipementsByLabo } from '@/Service/EquipementService'
-import { getActiveDepartements } from '@/Service/departementService'
+import { getEquipements } from '@/Service/EquipementService'
+import { getDepartements } from '@/Service/departementService'
 import type { Equipement, Laboratoire, Departement } from '@/types'
 
 const router = useRouter()
@@ -192,85 +186,74 @@ const loading = ref(false)
 
 // Charger les données au montage
 onMounted(async () => {
+  loading.value = true
   try {
     // Charger tous les départements
-    const resDepts = await getActiveDepartements()
+    const resDepts = await getDepartements()
     departements.value = Array.isArray(resDepts.data) ? resDepts.data : []
 
     // Charger tous les laboratoires
     const resLabos = await getLaboratoires()
     laboratoires.value = Array.isArray(resLabos.data) ? resLabos.data : []
 
+    // Charger tous les équipements
+    const resEquips = await getEquipements()
+    equipements.value = Array.isArray(resEquips.data) ? resEquips.data : []
+
     console.log('Départements chargés:', departements.value)
     console.log('Laboratoires chargés:', laboratoires.value)
+    console.log('Équipements chargés:', equipements.value)
   } catch (err) {
     console.error('Erreur chargement données:', err)
+  } finally {
+    loading.value = false
   }
 })
 
 // Laboratoires filtrés par département sélectionné
 const filteredLaboratoires = computed(() => {
-  if (!selectedDepartement.value) return []
-  return laboratoires.value.filter(labo => 
-    labo.departement?.id === selectedDepartement.value || 
+  if (!selectedDepartement.value) return laboratoires.value
+  return laboratoires.value.filter(labo =>
+    labo.departement?.id === selectedDepartement.value ||
     labo.departementId === selectedDepartement.value
   )
 })
 
 // Équipements filtrés par laboratoire sélectionné (ou tous les labos du département)
 const filteredEquipements = computed(() => {
-  if (!selectedDepartement.value) return []
-  
+  let result = equipements.value
+
+  if (selectedDepartement.value) {
+    result = result.filter(e => {
+      const laboId = e.laboratoire?.id || e.laboratoireId
+      if (!laboId) return false
+      const labo = laboratoires.value.find(l => l.id === laboId)
+      const deptId = labo?.departement?.id || labo?.departementId
+      return deptId === selectedDepartement.value
+    })
+  }
+
   if (selectedLaboratoire.value) {
-    // Filtrer par labo spécifique
-    return equipements.value.filter(e => 
-      (e.laboratoire?.id === selectedLaboratoire.value) || 
-      (e.laboratoireId === selectedLaboratoire.value)
+    result = result.filter(e =>
+      e.laboratoire?.id === selectedLaboratoire.value ||
+      e.laboratoireId === selectedLaboratoire.value
     )
   }
-  
-  // Sinon retourner tous les équipements chargés
-  return equipements.value
+
+  return result
 })
 
 // Quand le département change
-async function onDepartementChange() {
+function onDepartementChange() {
   selectedLaboratoire.value = ''
-  equipements.value = []
-  
-  if (!selectedDepartement.value) return
-  
-  // Charger les équipements de tous les labos du département
-  await loadEquipementsForDepartement()
 }
 
-// Charger tous les équipements des labos du département
-async function loadEquipementsForDepartement() {
-  loading.value = true
-  equipements.value = []
-  
-  const labosOfDept = filteredLaboratoires.value
-  
-  for (const labo of labosOfDept) {
-    try {
-      const res = await getEquipementsByLabo(labo.id)
-      if (Array.isArray(res.data)) {
-        const normalized = res.data.map((e: any) => {
-          let imgUrl = e.imageUrl || e.image_url || e.imageURL || e.img || null
-          if (imgUrl && !imgUrl.startsWith('http')) {
-            imgUrl = 'http://localhost:8085' + (imgUrl.startsWith('/') ? '' : '/') + imgUrl
-          }
-          return { ...e, imageUrl: imgUrl }
-        })
-        equipements.value.push(...normalized)
-      }
-    } catch (e) {
-      console.warn(`Erreur chargement équipements labo ${labo.id}`, e)
-    }
-  }
-  
-  loading.value = false
-  console.log('Équipements chargés:', equipements.value)
+function getDeptIdFromEquip(equip?: Equipement | null): number | undefined {
+  if (!equip) return undefined
+  const laboId = equip.laboratoire?.id || equip.laboratoireId
+  if (!laboId) return undefined
+  const labo = laboratoires.value.find(l => l.id === laboId)
+  return labo?.departement?.id || labo?.departementId
 }
 
 function getLaboNom(id?: number) {
@@ -339,7 +322,7 @@ function goToReclamation(equip: Equipement) {
   
   const laboId = equip.laboratoire?.id || equip.laboratoireId
   router.push({ 
-    path: '/enseignant/nouvelle-reclamation', 
+    path: '/etudiant/nouvelle-reclamation', 
     query: { 
       equipementId: equip.id, 
       equipementNom: equip.nom,

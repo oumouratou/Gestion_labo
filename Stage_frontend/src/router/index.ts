@@ -130,10 +130,28 @@ const router = createRouter({
   routes
 })
 
+function isBlockedEtudiant(user: any): boolean {
+  if (!user) return false
+  if (String(user.role || '').toLowerCase() !== 'etudiant') return false
+  if (user.blocked === true || user.isBlocked === true || user.bloque === true) return true
+  if (user.active === false || user.isActive === false || user.enabled === false) return true
+  const etat = String(user.etat || user.statut || user.accountStatus || '').toUpperCase()
+  return etat === 'BLOQUE' || etat === 'BLOCKED' || etat === 'INACTIF'
+}
+
 // 🔐 Auth Guard
 router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore()
   authStore.initAuth()
+
+  if (authStore.isAuthenticated && isBlockedEtudiant(authStore.currentUser)) {
+    authStore.logout()
+    authStore.error = 'Votre compte étudiant est bloqué. Contactez le technicien.'
+    if (to.path !== '/') {
+      next('/')
+      return
+    }
+  }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next('/')

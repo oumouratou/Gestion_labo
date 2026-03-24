@@ -332,6 +332,7 @@ import api from '@/Service/api'
 const authStore = useAuthStore()
 
 const user = computed(() => authStore.currentUser)
+const profilePassword = ref('')
 const profilePhotoUrl = ref<string | null>(null)
 const showEditModal = ref(false)
 const isUpdating = ref(false)
@@ -462,6 +463,33 @@ function getDepartementNom(): string {
   return 'Non renseigné'
 }
 
+function getPasswordDisplay(): string {
+  if (profilePassword.value) return profilePassword.value
+  const u = user.value as any
+  if (!u) return 'Non disponible'
+  return u.password || u.motDePasse || u.mdp || u.plainPassword || 'Non disponible'
+}
+
+async function loadProfileDetails() {
+  try {
+    const res = await api.get('/users/profil')
+    const data = res.data || {}
+
+    profilePassword.value = data.password || data.motDePasse || data.mdp || data.plainPassword || ''
+
+    if (authStore.currentUser) {
+      Object.assign(authStore.currentUser as any, {
+        password: data.password,
+        motDePasse: data.motDePasse,
+        mdp: data.mdp,
+        plainPassword: data.plainPassword,
+      })
+    }
+  } catch (error) {
+    console.warn('Impossible de charger les détails du profil:', error)
+  }
+}
+
 function showAlert(message: string, type: 'success' | 'error') {
   alertMessage.value = message
   alertType.value = type
@@ -585,6 +613,7 @@ onMounted(() => {
   }
   
   loadProfilePhoto()
+  loadProfileDetails()
   loadSettings()
 })
 </script>

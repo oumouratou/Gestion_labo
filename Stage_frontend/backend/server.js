@@ -2,7 +2,8 @@ const express = require('express')
 const cors = require('cors')
 
 const app = express()
-const PORT = 3000
+// Le frontend (Vite) proxifie /api vers http://localhost:8085
+const PORT = Number(process.env.PORT) || 8085
 
 // Middleware
 app.use(cors())
@@ -37,12 +38,12 @@ let equipements = [
 ]
 
 let users = [
-  { id: 1, nom: 'Admin', prenom: 'Technicien', email: 'tech@univ.fr', password: 'admin123', cin: 'AB123456', role: 'TECHNICIEN', departementId: 1, active: true },
-  { id: 2, nom: 'Martin', prenom: 'Alice', email: 'alice@univ.fr', password: 'alice123', cin: 'CD234567', role: 'ETUDIANT', departementId: 1, active: true },
-  { id: 3, nom: 'Durand', prenom: 'Bob', email: 'bob@univ.fr', password: 'bob123', cin: 'EF345678', role: 'ETUDIANT', departementId: 1, active: true },
-  { id: 4, nom: 'Bernard', prenom: 'Claire', email: 'claire@univ.fr', password: 'claire123', cin: 'GH456789', role: 'ETUDIANT', departementId: 2, active: true },
-  { id: 5, nom: 'Dupont', prenom: 'Jean', email: 'jean@univ.fr', password: 'jean123', cin: 'IJ567890', role: 'ENSEIGNANT', departementId: 1, active: true },
-  { id: 6, nom: 'Moreau', prenom: 'Marie', email: 'marie@univ.fr', password: 'marie123', cin: 'KL678901', role: 'ENSEIGNANT', departementId: 2, active: true }
+  { id: 1, nom: 'Admin', prenom: 'Technicien', email: 'tech@univ.fr', password: 'admin123', cin: 'AB123456', role: 'TECHNICIEN', departementId: null, active: true },
+  { id: 2, nom: 'Martin', prenom: 'Alice', email: 'alice@univ.fr', password: 'alice123', cin: 'CD234567', role: 'ETUDIANT', departementId: 1, niveau: 'L3', classe: 'Info-A', active: true },
+  { id: 3, nom: 'Durand', prenom: 'Bob', email: 'bob@univ.fr', password: 'bob123', cin: 'EF345678', role: 'ETUDIANT', departementId: 1, niveau: 'L2', classe: 'Info-B', active: true },
+  { id: 4, nom: 'Bernard', prenom: 'Claire', email: 'claire@univ.fr', password: 'claire123', cin: 'GH456789', role: 'ETUDIANT', departementId: 2, niveau: 'M1', classe: 'Math-1', active: true },
+  { id: 5, nom: 'Dupont', prenom: 'Jean', email: 'jean@univ.fr', password: 'jean123', cin: 'IJ567890', role: 'ENSEIGNANT', departementId: 1, isChefDepartement: true, active: true },
+  { id: 6, nom: 'Moreau', prenom: 'Marie', email: 'marie@univ.fr', password: 'marie123', cin: 'KL678901', role: 'ENSEIGNANT', departementId: 2, isChefDepartement: false, active: true }
 ]
 
 let reservations = [
@@ -79,6 +80,17 @@ function enrichUser(user) {
   const dept = departements.find(d => d.id === user.departementId)
   const { password, ...userWithoutPassword } = user
   return { ...userWithoutPassword, departement: dept || null }
+}
+
+function getUserFromAuthHeader(req) {
+  const token = req.headers.authorization?.split(' ')[1]
+  if (!token || !token.startsWith('fake-jwt-token-')) {
+    return null
+  }
+
+  const userId = parseInt(token.split('-').pop(), 10)
+  if (!Number.isFinite(userId)) return null
+  return users.find(u => u.id === userId) || null
 }
 
 function enrichReservation(reservation) {
@@ -124,11 +136,47 @@ app.post('/api/auth/login', (req, res) => {
 })
 
 app.post('/api/auth/register', (req, res) => {
-  const { nom, prenom, email, password, cin, role, departementId } = req.body
+  const {
+    nom,
+    prenom,
+    email,
+    password,
+    cin,
+    role,
+    departementId,
+    isChefDepartement,
+    chefDepartement,
+    niveau,
+    classe,
+  } = req.body
   
   // Vérifications
-  if (!nom || !prenom || !email || !password || !cin || !role || !departementId) {
-    return res.status(400).json('Tous les champs sont requis')
+  if (!nom || !prenom || !email || !password || !cin || !role) {
+    return res.status(400).json('Tous les champs de base sont requis')
+  }
+
+  const normalizedRole = String(role).toUpperCase()
+
+  const parsedDepartementId = (departementId === null || departementId === '' || departementId === undefined)
+    ? null
+    : parseInt(departementId)
+
+  // Département requis seulement si pas technicien
+  if (normalizedRole !== 'TECHNICIEN') {
+    if (!parsedDepartementId) {
+      return res.status(400).json('Veuillez sélectionner un département')
+    }
+    // Vérifier si le département existe
+    if (!departements.find(d => d.id === parsedDepartementId)) {
+      return res.status(400).json('Département invalide')
+    }
+  }
+
+  // Étudiant: niveau + classe requis
+  if (normalizedRole === 'ETUDIANT') {
+    if (!niveau || !classe) {
+      return res.status(400).json('Niveau et classe requis pour les étudiants')
+    }
   }
 
   // Vérifier si l'email existe déjà
@@ -141,11 +189,6 @@ app.post('/api/auth/register', (req, res) => {
     return res.status(400).json('Ce CIN est déjà enregistré')
   }
 
-  // Vérifier si le département existe
-  if (!departements.find(d => d.id === parseInt(departementId))) {
-    return res.status(400).json('Département invalide')
-  }
-
   const newUser = {
     id: nextUserId++,
     nom,
@@ -153,8 +196,11 @@ app.post('/api/auth/register', (req, res) => {
     email,
     password,
     cin,
-    role: role.toUpperCase(),
-    departementId: parseInt(departementId)
+    role: normalizedRole,
+    departementId: parsedDepartementId,
+    niveau: normalizedRole === 'ETUDIANT' ? String(niveau) : undefined,
+    classe: normalizedRole === 'ETUDIANT' ? String(classe) : undefined,
+    isChefDepartement: normalizedRole === 'ENSEIGNANT' ? Boolean(isChefDepartement ?? chefDepartement) : false
   }
 
   users.push(newUser)
@@ -167,19 +213,21 @@ app.post('/api/auth/register', (req, res) => {
 })
 
 app.get('/api/auth/me', (req, res) => {
-  // Simuler l'utilisateur connecté via token
-  const token = req.headers.authorization?.split(' ')[1]
-  if (!token || !token.startsWith('fake-jwt-token-')) {
-    return res.status(401).json('Non autorisé')
-  }
-  
-  const userId = parseInt(token.split('-').pop())
-  const user = users.find(u => u.id === userId)
+  const user = getUserFromAuthHeader(req)
   
   if (!user) {
-    return res.status(404).json('Utilisateur non trouvé')
+    return res.status(401).json('Non autorisé')
   }
 
+  res.json(enrichUser(user))
+})
+
+// Profil (utilisé par le frontend: /api/users/profil)
+app.get('/api/users/profil', (req, res) => {
+  const user = getUserFromAuthHeader(req)
+  if (!user) {
+    return res.status(401).json('Non autorisé')
+  }
   res.json(enrichUser(user))
 })
 

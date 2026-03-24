@@ -95,9 +95,9 @@
             <table class="table table-hover" style="min-width: 1200px;">
               <thead class="thead-light">
                 <tr>
-                  <th style="width: 50px;">N°</th>
+                  <th style="width: 50px;">Numéro</th>
+                  <th style="width: 90px;" class="text-center">Détails</th>
                   <th style="width: 120px;">Demandeur</th>
-                  <th style="width: 80px;">CIN</th>
                   <th style="width: 70px;">Rôle</th>
                   <th style="width: 100px;">Laboratoire</th>
                   <th style="width: 150px;">Motif</th>
@@ -117,13 +117,16 @@
                 >
                   <td><strong>{{ index + 1 }}</strong></td>
 
+                  <td class="text-center">
+                    <button class="btn btn-info btn-sm" @click="openDetailsModal(reservation)">
+                      <i class="fas fa-info-circle mr-1"></i> Détails
+                    </button>
+                  </td>
+
                   <!-- Nom + Prénom -->
                   <td>
                     <strong>{{ getDemandeurNom(reservation) }}</strong>
                   </td>
-
-                  <!-- CIN -->
-                  <td>{{ getDemandeurCin(reservation) }}</td>
 
                   <!-- Rôle -->
                   <td>
@@ -229,6 +232,44 @@
       </div>
     </div>
     <div class="modal-backdrop fade show" v-if="showRejectModal"></div>
+
+    <!-- Modal détails étudiant -->
+    <div class="modal fade" :class="{ show: showDetailsModal }" :style="{ display: showDetailsModal ? 'block' : 'none' }">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header bg-info text-white">
+            <h5 class="modal-title"><i class="fas fa-user-graduate mr-2"></i>Détails de l'étudiant</h5>
+            <button type="button" class="close text-white" @click="closeDetailsModal">&times;</button>
+          </div>
+          <div class="modal-body">
+            <table class="table table-bordered mb-0" v-if="selectedDetailsReservation">
+              <tbody>
+                <tr>
+                  <th style="width: 220px;">Nom complet</th>
+                  <td>{{ getDemandeurNom(selectedDetailsReservation) }}</td>
+                </tr>
+                <tr>
+                  <th>Niveau</th>
+                  <td>{{ getEtudiantNiveau(selectedDetailsReservation) }}</td>
+                </tr>
+                <tr>
+                  <th>Classe</th>
+                  <td>{{ getEtudiantClasse(selectedDetailsReservation) }}</td>
+                </tr>
+                <tr>
+                  <th>Département</th>
+                  <td>{{ getEtudiantDepartement(selectedDetailsReservation) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeDetailsModal">Fermer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-backdrop fade show" v-if="showDetailsModal"></div>
     </div><!-- fin v-else chef de département -->
   </div>
 </template>
@@ -250,6 +291,19 @@ interface Reservation {
   etudiantPrenom?: string
   etudiantCin?: string
   etudiantRole?: string
+  etudiantId?: number
+  etudiantNiveau?: string
+  etudiantClasse?: string
+  niveauEtudiant?: string
+  classeEtudiant?: string
+  departementEtudiant?: string
+  departementNomEtudiant?: string
+  niveauDemandeur?: string
+  classeDemandeur?: string
+  departementDemandeur?: string
+  departementNomDemandeur?: string
+  demandeurId?: number
+  userId?: number
   cin?: string
   role?: string
   nomDemandeur?: string
@@ -261,16 +315,28 @@ interface Reservation {
   motif?: string
   description?: string
   etudiant?: {
+    id?: number
     nom?: string
     prenom?: string
     cin?: string
     role?: string
+    niveau?: string
+    classe?: string
+    departement?: {
+      nom?: string
+    }
   }
   demandeur?: {
+    id?: number
     nom?: string
     prenom?: string
     cin?: string
     role?: string
+    niveau?: string
+    classe?: string
+    departement?: {
+      nom?: string
+    }
   }
 }
 
@@ -283,11 +349,14 @@ const isChefDepartement = computed(() => authStore.isChefDepartement)
 const reservations = ref<Reservation[]>([])
 const highlightedId = ref<number | null>(null)
 const highlightedRow = ref<any>(null)
+const userDetailsCache = new Map<number, any>()
 
 // Modal de refus
 const showRejectModal = ref(false)
 const selectedReservation = ref<Reservation | null>(null)
 const rejectMotif = ref('')
+const showDetailsModal = ref(false)
+const selectedDetailsReservation = ref<Reservation | null>(null)
 
 // Filtres depuis les query params
 const filterLaboId = computed(() => route.query.laboratoireId ? Number(route.query.laboratoireId) : null)
@@ -329,6 +398,149 @@ function getDemandeurCin(res: Reservation): string {
 
 function getDemandeurRole(res: Reservation): string {
   return res.etudiantRole || res.role || res.roleDemandeur || res.etudiant?.role || res.demandeur?.role || ''
+}
+
+function pickFirstText(...values: any[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim()
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  }
+  return undefined
+}
+
+function extractStudentId(res: Reservation): number | null {
+  const rawId = (res as any).etudiantId ?? (res as any).demandeurId ?? (res as any).userId ?? res.etudiant?.id ?? res.demandeur?.id
+  const parsed = Number(rawId)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+async function fetchUserDetailsById(userId: number): Promise<any | null> {
+  if (userDetailsCache.has(userId)) {
+    return userDetailsCache.get(userId)
+  }
+
+  try {
+    const byId = await api.get(`/users/${userId}`)
+    if (byId?.data) {
+      userDetailsCache.set(userId, byId.data)
+      return byId.data
+    }
+  } catch {
+    // Fallback vers la liste des users si l'endpoint /users/{id} n'est pas disponible
+  }
+
+  try {
+    const usersRes = await api.get('/users')
+    const users = Array.isArray(usersRes?.data)
+      ? usersRes.data
+      : Array.isArray(usersRes?.data?.content)
+        ? usersRes.data.content
+        : []
+    const found = users.find((u: any) => Number(u?.id) === userId) || null
+    userDetailsCache.set(userId, found)
+    return found
+  } catch {
+    userDetailsCache.set(userId, null)
+    return null
+  }
+}
+
+function mergeReservationWithUser(reservation: Reservation, user: any): Reservation {
+  const userDepartementNom = pickFirstText(
+    user?.departement?.nom,
+    typeof user?.departement === 'string' ? user.departement : undefined,
+    user?.departementNom,
+  )
+
+  const existingEtudiant = reservation.etudiant || {}
+  const existingDemandeur = reservation.demandeur || {}
+
+  return {
+    ...reservation,
+    etudiantId: reservation.etudiantId ?? reservation.demandeurId ?? reservation.userId ?? user?.id,
+    etudiant: {
+      ...existingEtudiant,
+      ...user,
+      departement: user?.departement ?? existingEtudiant.departement,
+    },
+    demandeur: {
+      ...existingDemandeur,
+      ...user,
+      departement: user?.departement ?? existingDemandeur.departement,
+    },
+    etudiantNiveau: pickFirstText(
+      (reservation as any).etudiantNiveau,
+      (reservation as any).niveauDemandeur,
+      (reservation as any).niveauEtudiant,
+      user?.niveau,
+      user?.niveauEtude,
+      user?.niveau_etude,
+      user?.niveauScolaire,
+    ),
+    etudiantClasse: pickFirstText(
+      (reservation as any).etudiantClasse,
+      (reservation as any).classeDemandeur,
+      (reservation as any).classeEtudiant,
+      user?.classe,
+      user?.classeEtudiant,
+      user?.classe_etudiant,
+      user?.groupe,
+    ),
+    departementNomDemandeur: pickFirstText(
+      (reservation as any).departementNomDemandeur,
+      (reservation as any).departementDemandeur,
+      (reservation as any).departementNomEtudiant,
+      (reservation as any).departementEtudiant,
+      userDepartementNom,
+    ),
+  }
+}
+
+function getEtudiantNiveau(res: Reservation): string {
+  return pickFirstText(
+    (res as any).etudiantNiveau,
+    (res as any).niveauDemandeur,
+    (res as any).niveauEtudiant,
+    res.etudiant?.niveau,
+    (res.etudiant as any)?.niveauEtude,
+    (res.etudiant as any)?.niveau_etude,
+    (res.etudiant as any)?.niveauScolaire,
+    res.demandeur?.niveau,
+    (res.demandeur as any)?.niveauEtude,
+    (res.demandeur as any)?.niveau_etude,
+    (res.demandeur as any)?.niveauScolaire,
+  ) || 'Non renseigné'
+}
+
+function getEtudiantClasse(res: Reservation): string {
+  return pickFirstText(
+    (res as any).etudiantClasse,
+    (res as any).classeDemandeur,
+    (res as any).classeEtudiant,
+    res.etudiant?.classe,
+    (res.etudiant as any)?.classeEtudiant,
+    (res.etudiant as any)?.classe_etudiant,
+    (res.etudiant as any)?.groupe,
+    res.demandeur?.classe,
+    (res.demandeur as any)?.classeEtudiant,
+    (res.demandeur as any)?.classe_etudiant,
+    (res.demandeur as any)?.groupe,
+  ) || 'Non renseigné'
+}
+
+function getEtudiantDepartement(res: Reservation): string {
+  return pickFirstText(
+    (res as any).departementNomDemandeur,
+    (res as any).departementDemandeur,
+    (res as any).departementNomEtudiant,
+    (res as any).departementEtudiant,
+    res.etudiant?.departement?.nom,
+    typeof (res.etudiant as any)?.departement === 'string' ? (res.etudiant as any).departement : undefined,
+    (res.etudiant as any)?.departementNom,
+    res.demandeur?.departement?.nom,
+    typeof (res.demandeur as any)?.departement === 'string' ? (res.demandeur as any).departement : undefined,
+    (res.demandeur as any)?.departementNom,
+  ) || 'Non renseigné'
 }
 
 function formatDate(dateStr: string) {
@@ -383,7 +595,45 @@ async function fetchReservations() {
       }
     }
     
-    reservations.value = data
+    const enrichedData = await Promise.all(
+      data.map(async (reservation: Reservation) => {
+        const needsAcademicDetails =
+          !pickFirstText(
+            (reservation as any).etudiantNiveau,
+            (reservation as any).niveauDemandeur,
+            (reservation as any).niveauEtudiant,
+            reservation.etudiant?.niveau,
+            reservation.demandeur?.niveau,
+          ) ||
+          !pickFirstText(
+            (reservation as any).etudiantClasse,
+            (reservation as any).classeDemandeur,
+            (reservation as any).classeEtudiant,
+            reservation.etudiant?.classe,
+            reservation.demandeur?.classe,
+          ) ||
+          !pickFirstText(
+            (reservation as any).departementNomDemandeur,
+            (reservation as any).departementDemandeur,
+            (reservation as any).departementNomEtudiant,
+            (reservation as any).departementEtudiant,
+            reservation.etudiant?.departement?.nom,
+            reservation.demandeur?.departement?.nom,
+          )
+
+        if (!needsAcademicDetails) return reservation
+
+        const studentId = extractStudentId(reservation)
+        if (!studentId) return reservation
+
+        const userDetails = await fetchUserDetailsById(studentId)
+        if (!userDetails) return reservation
+
+        return mergeReservationWithUser(reservation, userDetails)
+      }),
+    )
+
+    reservations.value = enrichedData
     console.log("Réservations du département chargées:", reservations.value.length)
   } catch (err) {
     console.error('Erreur chargement reservations:', err)
@@ -411,6 +661,16 @@ function closeRejectModal() {
   showRejectModal.value = false
   selectedReservation.value = null
   rejectMotif.value = ''
+}
+
+function openDetailsModal(reservation: Reservation) {
+  selectedDetailsReservation.value = reservation
+  showDetailsModal.value = true
+}
+
+function closeDetailsModal() {
+  showDetailsModal.value = false
+  selectedDetailsReservation.value = null
 }
 
 async function confirmReject() {

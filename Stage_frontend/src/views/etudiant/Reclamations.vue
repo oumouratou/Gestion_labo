@@ -18,11 +18,11 @@
             <table class="table table-bordered table-striped table-hover" v-if="reclamations.length">
               <thead class="bg-info text-white">
                 <tr>
-                  <th>N°</th>
+                  <th>Numéro</th>
                   <th>Laboratoire</th>
                   <th>Équipement</th>
                   <th>Description</th>
-                  <th>Identifiant Équipement</th>
+                  <th>Identifiant équipement</th>
                   <th>Priorité</th>
                   <th>État</th>
                   <th>Date</th>
@@ -40,7 +40,7 @@
                   <td>{{ rec.laboratoireNom || 'N/A' }}</td>
                   <td>{{ rec.equipementNom || 'N/A' }}</td>
                   <td>{{ rec.description }}</td>
-                  <td><code class="text-primary">{{ getEquipementIdentifiant(rec) }}</code></td>
+                  <td>{{ getEquipementIdentifiant(rec) }}</td>
                   <td>
                     <span :class="getPrioriteBadge(getPriorite(rec))">
                       {{ formatPriorite(getPriorite(rec)) }}
@@ -56,16 +56,18 @@
                     <button
                       class="btn btn-warning btn-sm"
                       @click="openModal(rec)"
-                      :disabled="rec.etat !== 'NON_TRAITEE'"
+                      :disabled="isActionDisabled(rec)"
+                      :title="getActionDisabledReason(rec)"
                     >
                       <i class="fas fa-edit mr-1"></i> Modifier
                     </button>
                     <button
                       class="btn btn-danger btn-sm"
-                      @click="annulerReclamation(rec.id)"
-                      :disabled="rec.etat !== 'NON_TRAITEE'"
+                      @click="supprimerReclamation(rec)"
+                      :disabled="isActionDisabled(rec)"
+                      :title="getActionDisabledReason(rec)"
                     >
-                      <i class="fas fa-times mr-1"></i> Annuler
+                      <i class="fas fa-trash mr-1"></i> Supprimer
                     </button>
                   </td>
                 </tr>
@@ -110,6 +112,7 @@
         </div>
       </div>
     </div>
+
     <div class="modal-backdrop fade show" v-if="showModal"></div>
   </div>
 </template>
@@ -117,8 +120,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-import ReclamationService from '@/Service/ReclamationService'
 import { getEquipements } from '@/Service/EquipementService'
+import ReclamationService from '@/Service/ReclamationService'
 
 const route = useRoute()
 
@@ -136,41 +139,28 @@ interface Reclamation {
 }
 
 const reclamations = ref<Reclamation[]>([])
-const allEquipements = ref<any[]>([])
+const equipementsById = ref<Record<number, any>>({})
 const showModal = ref(false)
 const form = reactive({ id: 0, description: '', quantite: 1 })
 const highlightedId = ref<number | null>(null)
 const highlightedRow = ref<any>(null)
-// 🔹 Charger les équipements pour récupérer les identifiants
-async function fetchEquipements() {
-  try {
-    const res = await getEquipements()
-    allEquipements.value = Array.isArray(res.data) ? res.data : []
-  } catch (err) {
-    console.error('Erreur chargement équipements:', err)
-    allEquipements.value = []
-  }
-}
 
-function getEquipementIdentifiant(rec: any): string {
-  const equipId = rec.equipementId || rec.equipement?.id
-  if (rec.equipementIdentifiant || rec.identifiantEquipement) {
-    return rec.equipementIdentifiant || rec.identifiantEquipement
-  }
-  if (equipId) {
-    const equip = allEquipements.value.find((e: any) => e.id === equipId)
-    if (equip?.identifiant) return equip.identifiant
-    if (equip) {
-      const prefix = (equip.nom || 'EQ').substring(0, 3).toUpperCase()
-      return `${prefix}-${String(equip.id).padStart(4, '0')}`
-    }
-  }
-  return 'N/A'
-}
 // 🔹 Charger les réclamations de l'étudiant connecté (triées par date décroissante)
 async function fetchReclamations() {
   try {
-    const res = await ReclamationService.getReclamationsEtudiantConnecte()
+    const [reclamationsRes, equipementsRes] = await Promise.all([
+      ReclamationService.getReclamationsEtudiantConnecte(),
+      getEquipements()
+    ])
+
+    const allEquipements = Array.isArray(equipementsRes.data) ? equipementsRes.data : []
+    equipementsById.value = allEquipements.reduce((acc: Record<number, any>, eq: any) => {
+      const id = Number(eq?.id)
+      if (Number.isFinite(id) && id > 0) acc[id] = eq
+      return acc
+    }, {})
+
+    const res = reclamationsRes
     const data = Array.isArray(res.data) ? res.data : []
     // Trier par date décroissante (plus récent en premier)
     reclamations.value = data.sort((a: Reclamation, b: Reclamation) => {
@@ -186,6 +176,11 @@ async function fetchReclamations() {
 
 // 🔹 Ouvrir le modal pour modifier une réclamation
 function openModal(rec: Reclamation) {
+  if (isActionDisabled(rec)) {
+    alert(getActionDisabledReason(rec))
+    return
+  }
+
   form.id = rec.id
   form.description = rec.description
   form.quantite = rec.quantite
@@ -213,17 +208,32 @@ async function handleSubmit() {
 }
 
 // 🔹 Annuler réclamation (par l'étudiant lui-même - sans notification)
-async function annulerReclamation(id: number) {
-  if (!confirm("Voulez-vous annuler cette réclamation ?")) return
+async function supprimerReclamation(rec: Reclamation) {
+  if (isActionDisabled(rec)) {
+    alert(getActionDisabledReason(rec))
+    return
+  }
+
+  if (!confirm("Voulez-vous supprimer cette réclamation ?")) return
   try {
-    // Utiliser un endpoint spécifique pour auto-annulation (sans notification)
-    await ReclamationService.autoAnnulerReclamation(id);
-    alert("✅ Réclamation annulée.");
+    await ReclamationService.deleteReclamation(rec.id)
+    alert("✅ Réclamation supprimée.")
     await fetchReclamations()
   } catch (error: any) {
     console.error('Erreur annulation:', error)
-    alert("❌ Erreur: " + (error.response?.data?.message || error.message));
+    alert("❌ Erreur: " + (error.response?.data?.message || error.message))
   }
+}
+
+function isActionDisabled(rec: Reclamation): boolean {
+  return rec.etat !== 'NON_TRAITEE'
+}
+
+function getActionDisabledReason(rec: Reclamation): string {
+  if (rec.etat === 'TRAITEE') return 'Réclamation déjà traitée'
+  if (rec.etat === 'ANNULEE') return 'Réclamation déjà annulée'
+  if (rec.etat === 'REFUSEE') return 'Réclamation déjà refusée'
+  return rec.etat === 'NON_TRAITEE' ? '' : 'Action indisponible'
 }
 
 // 🔹 Récupérer la priorité (gérer différents noms de champs)
@@ -237,6 +247,18 @@ function getPriorite(rec: Reclamation): string {
     return 'MOYENNE'
   }
   return 'MOYENNE'
+}
+
+function getEquipementIdentifiant(rec: Reclamation): string {
+  const recAny = rec as any
+  const equipementId = Number(recAny.equipementId || recAny.equipement?.id)
+  const mappedEquipement = Number.isFinite(equipementId) ? equipementsById.value[equipementId] : null
+  return recAny.equipementIdentifiant
+    || recAny.identifiantEquipement
+    || recAny.identifiant
+    || mappedEquipement?.identifiant
+    || recAny.equipement?.identifiant
+    || ''
 }
 
 // 🔹 Styles badge pour priorité
@@ -283,7 +305,6 @@ function formatDate(date: string) {
 }
 
 onMounted(async () => {
-  await fetchEquipements()
   await fetchReclamations()
   
   // Vérifier si on doit highlight une réclamation (venant d'une notification)

@@ -24,11 +24,10 @@
             <table class="table table-bordered table-striped table-hover">
               <thead class="bg-success text-white">
                 <tr>
-                  <th>N°</th>
+                  <th>Numéro</th>
                   <th>Identifiant</th>
                   <th>Nom</th>
                   <th>Caractéristique</th>
-                  <th>Qté</th>
                   <th>Laboratoire</th>
                   <th>État</th>
                   <th>Date acquisition</th>
@@ -43,7 +42,6 @@
                   </td>
                   <td>{{ equip.nom }}</td>
                   <td>{{ truncateText(equip.caracteristique, 30) }}</td>
-                  <td>{{ equip.quantite }}</td>
                   <td>{{ equip.laboratoire?.nomLabo || 'N/A' }}</td>
                   <td>
                     <span :class="getEtatBadge(equip.etat)">
@@ -71,7 +69,7 @@
                   </td>
                 </tr>
                 <tr v-if="equipements.length === 0">
-                  <td colspan="9" class="text-center">Aucun équipement disponible</td>
+                  <td colspan="8" class="text-center">Aucun équipement disponible</td>
                 </tr>
               </tbody>
             </table>
@@ -127,11 +125,6 @@
               <div class="form-group">
                 <label>Caractéristique</label>
                 <textarea class="form-control" v-model="form.caracteristique" required></textarea>
-              </div>
-
-              <div class="form-group">
-                <label>Quantité</label>
-                <input type="number" class="form-control" v-model="form.quantite" min="1" required />
               </div>
 
               <div class="form-group">
@@ -447,7 +440,7 @@ async function handleSubmit() {
     // Gérer l'erreur 409 (doublon)
     if (err.response?.status === 409) {
       const errorMsg = err.response?.data?.error || err.response?.data?.message || 'Un équipement avec cet identifiant ou ce nom existe déjà'
-      alert('⚠️ Conflit : ' + errorMsg)
+      alert('a️ Conflit : ' + errorMsg)
     } else {
       alert("Erreur lors de l'enregistrement : " + (err.response?.data?.error || err.response?.data?.message || err.message))
     }

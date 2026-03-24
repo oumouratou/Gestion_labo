@@ -70,11 +70,11 @@
             <table class="table table-hover text-nowrap" v-if="reclamations.length > 0">
               <thead class="thead-light">
                 <tr>
-                  <th>N°</th>
+                  <th>Numéro</th>
                   <th>Laboratoire</th>
                   <th>Équipement</th>
                   <th>Description</th>
-                  <th>Identifiant Équipement</th>
+                  <th>Identifiant équipement</th>
                   <th>Priorité</th>
                   <th>Date</th>
                   <th>Statut</th>
@@ -93,7 +93,7 @@
                   <td>{{ rec.laboratoireNom || 'N/A' }}</td>
                   <td>{{ rec.equipementNom || 'N/A' }}</td>
                   <td>{{ truncateText(rec.description, 50) }}</td>
-                  <td><code class="text-primary">{{ getEquipementIdentifiant(rec) }}</code></td>
+                  <td>{{ getEquipementIdentifiant(rec) }}</td>
                   <td>
                     <span :class="getPrioriteBadge(getPriorite(rec))">
                       {{ formatPriorite(getPriorite(rec)) }}
@@ -107,10 +107,20 @@
                   </td>
                   <td class="text-center">
                     <div class="btn-group">
-                      <button class="btn btn-info btn-sm" @click="openModal(rec)" title="Modifier" :disabled="rec.etat !== 'NON_TRAITEE'">
+                      <button
+                        class="btn btn-info btn-sm"
+                        @click="openModal(rec)"
+                        :disabled="isActionDisabled(rec)"
+                        :title="getActionDisabledReason(rec) || 'Modifier'"
+                      >
                         <i class="fas fa-edit mr-1"></i> Modifier
                       </button>
-                      <button class="btn btn-danger btn-sm" @click="annulerReclamation(rec.id)" title="Annuler" :disabled="rec.etat !== 'NON_TRAITEE'">
+                      <button
+                        class="btn btn-danger btn-sm"
+                        @click="supprimerReclamation(rec)"
+                        :disabled="isActionDisabled(rec)"
+                        :title="getActionDisabledReason(rec) || 'Annuler'"
+                      >
                         <i class="fas fa-times mr-1"></i> Annuler
                       </button>
                     </div>
@@ -166,12 +176,12 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-import ReclamationService from '@/Service/ReclamationService'
 import { getEquipements } from '@/Service/EquipementService'
+import ReclamationService from '@/Service/ReclamationService'
 
 const route = useRoute()
 const reclamations = ref<any[]>([])
-const allEquipements = ref<any[]>([])
+const equipementsById = ref<Record<number, any>>({})
 const showModal = ref(false)
 const form = reactive({ id: 0, description: '', quantite: 1 })
 const highlightedId = ref<number | null>(null)
@@ -183,35 +193,21 @@ const treatedCount = computed(() => reclamations.value.filter(r => r.etat === 'T
 const refusedCount = computed(() => reclamations.value.filter(r => r.etat === 'REFUSEE').length)
 const cancelledCount = computed(() => reclamations.value.filter(r => r.etat === 'ANNULEE').length)
 
-async function fetchEquipements() {
-  try {
-    const res = await getEquipements()
-    allEquipements.value = Array.isArray(res.data) ? res.data : []
-  } catch (err) {
-    console.error('Erreur chargement équipements:', err)
-    allEquipements.value = []
-  }
-}
-
-function getEquipementIdentifiant(rec: any): string {
-  const equipId = rec.equipementId || rec.equipement?.id
-  if (rec.equipementIdentifiant || rec.identifiantEquipement) {
-    return rec.equipementIdentifiant || rec.identifiantEquipement
-  }
-  if (equipId) {
-    const equip = allEquipements.value.find((e: any) => e.id === equipId)
-    if (equip?.identifiant) return equip.identifiant
-    if (equip) {
-      const prefix = (equip.nom || 'EQ').substring(0, 3).toUpperCase()
-      return `${prefix}-${String(equip.id).padStart(4, '0')}`
-    }
-  }
-  return 'N/A'
-}
-
 async function fetchReclamations() {
   try {
-    const res = await ReclamationService.getReclamationsEnseignantConnecte()
+    const [reclamationsRes, equipementsRes] = await Promise.all([
+      ReclamationService.getReclamationsEnseignantConnecte(),
+      getEquipements()
+    ])
+
+    const allEquipements = Array.isArray(equipementsRes.data) ? equipementsRes.data : []
+    equipementsById.value = allEquipements.reduce((acc: Record<number, any>, eq: any) => {
+      const id = Number(eq?.id)
+      if (Number.isFinite(id) && id > 0) acc[id] = eq
+      return acc
+    }, {})
+
+    const res = reclamationsRes
     const data = Array.isArray(res.data) ? res.data : []
     // Trier par date décroissante (plus récent en premier)
     reclamations.value = data.sort((a: any, b: any) => {
@@ -226,6 +222,11 @@ async function fetchReclamations() {
 }
 
 function openModal(rec: any) {
+  if (isActionDisabled(rec)) {
+    alert(getActionDisabledReason(rec))
+    return
+  }
+
   form.id = rec.id
   form.description = rec.description
   form.quantite = rec.quantite
@@ -240,28 +241,44 @@ async function handleSubmit() {
     await ReclamationService.updateReclamation(form.id, {
       description: form.description
     });
-    alert("✅ Réclamation modifiée avec succès !");
+    alert("Réclamation modifiée avec succès !");
     await fetchReclamations();
     closeModal();
   } catch (error: any) {
     console.error("Erreur modification :", error);
-    alert("❌ Erreur: " + (error.response?.data?.message || error.response?.data || error.message));
+    alert("Erreur: " + (error.response?.data?.message || error.response?.data || error.message));
   }
 }
 
-async function annulerReclamation(id: number) {
-  if (!confirm("Voulez-vous annuler cette réclamation ?")) return
+async function supprimerReclamation(rec: any) {
+  if (isActionDisabled(rec)) {
+    alert(getActionDisabledReason(rec))
+    return
+  }
+
+  if (!confirm("Voulez-vous supprimer cette réclamation ?")) return
   try {
-    await ReclamationService.autoAnnulerReclamation(id)
-    alert('✅ Réclamation annulée avec succès.')
+    await ReclamationService.deleteReclamation(rec.id)
     await fetchReclamations()
   } catch (error: any) {
-    console.error('Erreur annulation:', error)
-    alert('❌ Erreur: ' + (error.response?.data?.message || error.response?.data || error.message))
+    console.error('Erreur suppression réclamation:', error)
+    alert("Erreur: " + (error.response?.data?.message || error.message))
   }
 }
 
-// 🔹 Récupérer la priorité (gérer différents noms de champs)
+function isActionDisabled(rec: any): boolean {
+  return rec?.etat !== 'NON_TRAITEE'
+}
+
+function getActionDisabledReason(rec: any): string {
+  const etat = String(rec?.etat || '').toUpperCase()
+  if (etat === 'TRAITEE') return 'Réclamation déjà traitée'
+  if (etat === 'ANNULEE') return 'Réclamation déjà annulée'
+  if (etat === 'REFUSEE') return 'Réclamation déjà refusée'
+  return etat === 'NON_TRAITEE' ? '' : 'Action indisponible'
+}
+
+// x Récupérer la priorité (gérer différents noms de champs)
 function getPriorite(rec: any): string {
   const priorite = rec.priorite || rec.priority || rec.prioriteReclamation
   if (priorite) {
@@ -273,7 +290,18 @@ function getPriorite(rec: any): string {
   return 'MOYENNE'
 }
 
-// 🔹 Styles badge pour priorité
+function getEquipementIdentifiant(rec: any): string {
+  const equipementId = Number(rec?.equipementId || rec?.equipement?.id)
+  const mappedEquipement = Number.isFinite(equipementId) ? equipementsById.value[equipementId] : null
+  return rec?.equipementIdentifiant
+    || rec?.identifiantEquipement
+    || rec?.identifiant
+    || mappedEquipement?.identifiant
+    || rec?.equipement?.identifiant
+    || ''
+}
+
+// x Styles badge pour priorité
 function getPrioriteBadge(priorite?: string) {
   return {
     HAUTE: 'badge badge-danger',
@@ -282,7 +310,7 @@ function getPrioriteBadge(priorite?: string) {
   }[priorite || 'MOYENNE'] || 'badge badge-secondary'
 }
 
-// 🔹 Texte lisible pour la priorité
+// x Texte lisible pour la priorité
 function formatPriorite(priorite?: string) {
   return {
     HAUTE: 'Haute',
@@ -319,7 +347,6 @@ function truncateText(text: string, maxLength: number) {
 }
 
 onMounted(async () => {
-  await fetchEquipements()
   await fetchReclamations()
   
   // Vérifier si on doit highlight une réclamation (venant d'une notification)

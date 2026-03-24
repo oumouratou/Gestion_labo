@@ -160,7 +160,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { getNotificationsEnseignant, markNotificationAsRead } from '@/Service/NotificationService'
+import { getReservationsByMonDepartement } from '@/Service/ReservationService'
+import { getMesLabos } from '@/Service/LaboratoireService'
 import api from '@/Service/api'
 
 interface NotificationDTO {
@@ -177,6 +180,7 @@ interface NotificationDTO {
 }
 
 const router = useRouter()
+const authStore = useAuthStore()
 const notifications = ref<NotificationDTO[]>([])
 const activeFilter = ref<'all' | 'RESERVATION' | 'RECLAMATION'>('all')
 const showDetailModal = ref(false)
@@ -189,6 +193,63 @@ const filteredNotifications = computed(() => {
 
 const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
 
+function normalizeText(value: any): string {
+  return String(value || '').trim().toLowerCase()
+}
+
+async function getChefDepartementReservationScope(): Promise<{ reservationIds: Set<number>; laboNames: Set<string> }> {
+  const reservationIds = new Set<number>()
+  const laboNames = new Set<string>()
+
+  try {
+    const reservationsRes = await getReservationsByMonDepartement()
+    const rows = Array.isArray(reservationsRes?.data) ? reservationsRes.data : []
+    for (const row of rows) {
+      const id = Number((row as any)?.id)
+      if (Number.isFinite(id) && id > 0) reservationIds.add(id)
+      const nomLabo = normalizeText((row as any)?.laboratoireNom || (row as any)?.laboratoire?.nomLabo || (row as any)?.laboratoire?.nom)
+      if (nomLabo) laboNames.add(nomLabo)
+    }
+  } catch (error) {
+    console.warn('Impossible de charger les réservations du département du chef:', error)
+  }
+
+  try {
+    const labosRes = await getMesLabos()
+    const labos = Array.isArray(labosRes?.data) ? labosRes.data : []
+    for (const labo of labos) {
+      const nomLabo = normalizeText((labo as any)?.nomLabo || (labo as any)?.nom)
+      if (nomLabo) laboNames.add(nomLabo)
+    }
+  } catch (error) {
+    console.warn('Impossible de charger les labos du chef:', error)
+  }
+
+  return { reservationIds, laboNames }
+}
+
+function filterReservationNotificationsForChef(
+  rows: NotificationDTO[],
+  scope: { reservationIds: Set<number>; laboNames: Set<string> },
+): NotificationDTO[] {
+  return rows.filter((notif) => {
+    const type = String(notif?.type || '').toUpperCase()
+    if (type !== 'RESERVATION') return true
+
+    const reservationId = Number(notif?.reservationId)
+    if (Number.isFinite(reservationId) && reservationId > 0 && scope.reservationIds.has(reservationId)) {
+      return true
+    }
+
+    const laboNotif = normalizeText(notif?.laboName || notif?.laboratoireNom)
+    if (laboNotif && scope.laboNames.has(laboNotif)) {
+      return true
+    }
+
+    return false
+  })
+}
+
 async function fetchNotifications() {
   try {
     console.log("Chargement des notifications enseignant...")
@@ -200,6 +261,11 @@ async function fetchNotifications() {
       notifications.value = res
     } else {
       notifications.value = []
+    }
+
+    if (authStore.isChefDepartement) {
+      const scope = await getChefDepartementReservationScope()
+      notifications.value = filterReservationNotificationsForChef(notifications.value, scope)
     }
     
     // Trier par date décroissante

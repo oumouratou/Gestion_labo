@@ -57,3 +57,20 @@ export const unblockUser = (id: number) =>
 
 // ================== SUPPRIMER ==================
 export const deleteUser = (id: number) => api.delete(`/users/${id}`)
+
+// ================== BLOQUER / DEBLOQUER ETUDIANT ==================
+export const blockEtudiant = async (id: number) => {
+	try {
+		return await api.put(`/users/etudiants/${id}/block`)
+	} catch {
+		return api.put(`/users/${id}/block`)
+	}
+}
+
+export const unblockEtudiant = async (id: number) => {
+	try {
+		return await api.put(`/users/etudiants/${id}/unblock`)
+	} catch {
+		return api.put(`/users/${id}/unblock`)
+	}
+}

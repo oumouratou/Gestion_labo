@@ -21,7 +21,7 @@
             <table class="table table-bordered table-striped table-hover" v-if="mesReservations.length > 0">
               <thead class="bg-info">
                 <tr>
-                  <th>N°</th>
+                  <th>Numéro</th>
                   <th>Laboratoire</th>
                   <th>Date</th>
                   <th>Horaire</th>
@@ -48,23 +48,25 @@
                     </span>
                   </td>
                   <td class="d-flex gap-1">
-                    <!-- Modifier -->
                     <button 
                       class="btn btn-warning btn-sm"
                       @click="openModal(res)"
-                      :disabled="res.statut !== 'EN_ATTENTE'"
+                      :disabled="isReservationTraitee(res)"
+                      :title="getReservationActionReason(res)"
                     >
                       <i class="fas fa-edit mr-1"></i> Modifier
                     </button>
 
-                    <!-- Annuler -->
                     <button 
                       class="btn btn-danger btn-sm"
-                      @click="annulerReservation(res.id)"
-                      :disabled="res.statut !== 'EN_ATTENTE'"
+                      @click="supprimerReservation(res)"
+                      :disabled="isReservationTraitee(res)"
+                      :title="getReservationActionReason(res)"
                     >
-                      <i class="fas fa-times mr-1"></i> Annuler
+                      <i class="fas fa-trash mr-1"></i> Supprimer
                     </button>
+
+    
                   </td>
                 </tr>
               </tbody>
@@ -136,7 +138,7 @@ const reservations = ref<any[]>([])
 const highlightedId = ref<number | null>(null)
 const highlightedRow = ref<any>(null)
 
-// 🔹 Modal et formulaire
+// x Modal détails et modal modification
 const showModal = ref(false)
 const form = reactive({
   id: 0,
@@ -147,7 +149,7 @@ const form = reactive({
   motif: ''
 })
 
-// 🔹 Récupération des réservations
+// x Récupération des réservations
 async function fetchReservations() {
   try {
     const response = await api.get('/reservations')
@@ -158,7 +160,7 @@ async function fetchReservations() {
   }
 }
 
-// 🔹 Filtre les réservations pour l'étudiant connecté (triées par date décroissante)
+// x Filtre les réservations pour l'étudiant connecté (triées par date décroissante)
 const mesReservations = computed(() => {
   if (!currentUser.value) return []
   const userId = Number(currentUser.value.id)
@@ -175,10 +177,10 @@ const mesReservations = computed(() => {
     })
 })
 
-// 🔹 Ouvre le modal pour modifier
+// x Ouvre le modal pour modifier
 function openModal(res: any) {
-  if (res.statut !== 'EN_ATTENTE') {
-    alert("Impossible de modifier une réservation déjà traitée")
+  if (isReservationTraitee(res)) {
+    alert(getReservationActionReason(res))
     return
   }
 
@@ -196,7 +198,7 @@ function closeModal() {
   showModal.value = false
 }
 
-// 🔹 Submit modification
+// x Submit modification
 async function handleSubmit() {
   try {
     if (form.heureFin <= form.heureDebut) {
@@ -220,37 +222,77 @@ async function handleSubmit() {
   }
 }
 
-// 🔹 Annuler réservation
-async function annulerReservation(id: number) {
-  if (!confirm("Voulez-vous annuler cette réservation ?")) return
-  try {
-    await api.put(`/reservations/${id}/annuler`)
-    await fetchReservations()
-  } catch (error) {
-    console.error('Erreur lors de l\'annulation', error)
-  }
-}
-
-// 🔹 Supprimer réservation (uniquement EN_ATTENTE)
-async function supprimerReservation(id: number) {
-  const res = reservations.value.find(r => r.id === id)
-  if (!res) return
-
-  if (res.statut !== 'EN_ATTENTE') {
-    alert("Impossible de supprimer une réservation déjà traitée")
+// x Supprimer réservation (uniquement EN_ATTENTE)
+async function supprimerReservation(res: any) {
+  if (isReservationTraitee(res)) {
+    alert(getReservationActionReason(res))
     return
   }
 
   if (!confirm("Voulez-vous supprimer définitivement cette réservation ?")) return
   try {
-    await api.delete(`/reservations/${id}`)
+    await api.delete(`/reservations/${res.id}`)
     await fetchReservations()
-  } catch (error) {
+  } catch (error: any) {
+    const status = error?.response?.status
+    if (status === 404 || status === 405) {
+      try {
+        await api.put(`/reservations/${res.id}/auto-annuler`)
+        await fetchReservations()
+        return
+      } catch (fallbackError) {
+        console.error('Erreur fallback suppression -> auto-annuler', fallbackError)
+      }
+    }
     console.error('Erreur lors de la suppression', error)
   }
 }
 
-// 🔹 Badges statut
+function isReservationTraitee(res: any): boolean {
+  return res?.statut !== 'EN_ATTENTE'
+}
+
+function isReservationEnAttente(res: any): boolean {
+  return res?.statut === 'EN_ATTENTE'
+}
+
+async function approveReservation(res: any) {
+  if (!confirm("Voulez-vous approuver cette réservation ?")) return
+  try {
+    await api.put(`/reservations/${res.id}/approuver`)
+    await fetchReservations()
+    alert('Réservation approuvée avec succès')
+  } catch (error: any) {
+    console.error('Erreur lors de l\'approbation', error)
+    alert('Impossible d\'approuver la réservation: ' + (error.response?.data?.message || error.message))
+  }
+}
+
+async function rejectReservation(res: any) {
+  const motif = prompt('Veuillez indiquer un motif de refus:')
+  if (!motif) return
+  
+  try {
+    await api.put(`/reservations/${res.id}/refuser`, { motif })
+    await fetchReservations()
+    alert('Réservation refusée')
+  } catch (error: any) {
+    console.error('Erreur lors du refus', error)
+    alert('Impossible de refuser la réservation: ' + (error.response?.data?.message || error.message))
+  }
+}
+
+function getReservationActionReason(res: any): string {
+  const statut = String(res?.statut || '').toUpperCase()
+  if (statut === 'APPROUVEE' || statut === 'CONFIRMEE' || statut === 'RESERVEE') {
+    return 'Réservation déjà traitée'
+  }
+  if (statut === 'ANNULEE') return 'Réservation déjà annulée'
+  if (statut === 'REFUSEE') return 'Réservation déjà refusée'
+  return statut === 'EN_ATTENTE' ? '' : 'Action indisponible'
+}
+
+// x Badges statut
 function getStatutBadge(statut: string) {
   const badges: Record<string, string> = {
     RESERVEE: 'badge badge-success',

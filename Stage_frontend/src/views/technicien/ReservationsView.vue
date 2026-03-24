@@ -79,7 +79,7 @@
             <table class="table table-hover" style="min-width: 1200px;">
               <thead class="thead-light">
                 <tr>
-                  <th style="width: 50px;">N°</th>
+                  <th style="width: 50px;">Numéro</th>
                   <th style="width: 120px;">Demandeur</th>
                   <th style="width: 80px;">CIN</th>
                   <th style="width: 70px;">Rôle</th>

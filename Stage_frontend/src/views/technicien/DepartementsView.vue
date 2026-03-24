@@ -24,7 +24,7 @@
             <table class="table table-bordered table-hover dept-table">
               <thead class="thead-light">
                 <tr>
-                  <th>N°</th>
+                  <th>Numéro</th>
                   <th>Nom</th>
                   <th class="d-none d-md-table-cell">Description</th>
                   <th class="text-center">État</th>
@@ -36,7 +36,7 @@
                 <tr v-for="(dept, index) in departements" :key="dept.id">
                   <td>{{ index + 1 }}</td>
                   <td><strong>{{ dept.nom }}</strong></td>
-                  <td class="d-none d-md-table-cell">{{ dept.description || '—' }}</td>
+                  <td class="d-none d-md-table-cell">{{ dept.description || '' }}</td>
                   <td class="text-center">
                     <span :class="dept.actif !== false ? 'badge badge-success' : 'badge badge-danger'">
                       <i :class="dept.actif !== false ? 'fas fa-check-circle mr-1' : 'fas fa-ban mr-1'"></i>
@@ -93,8 +93,8 @@
               <div class="form-group" v-if="isEdit">
                 <label>État <span class="text-danger">*</span></label>
                 <select class="form-control" v-model="form.actif">
-                  <option :value="true">✅ Actif (visible par tous les utilisateurs)</option>
-                  <option :value="false">🚫 Inactif (masqué pour les étudiants/enseignants)</option>
+                  <option :value="true">Actif (visible par tous les utilisateurs)</option>
+                  <option :value="false">xa Inactif (masqué pour les étudiants/enseignants)</option>
                 </select>
                 <small class="form-text text-muted">
                   <i class="fas fa-info-circle mr-1"></i>
@@ -191,7 +191,7 @@ async function handleDelete(id: number) {
     // Message d'erreur plus clair
     const errorMsg = e.response?.data?.message || e.response?.data?.error || e.message
     if (errorMsg.toLowerCase().includes('laboratoire') || errorMsg.toLowerCase().includes('labo')) {
-      alert('❌ Impossible de supprimer ce département car il contient des laboratoires.\n\n💡 Vous devez d\'abord supprimer ou déplacer les laboratoires de ce département.')
+      alert('R Impossible de supprimer ce département car il contient des laboratoires.\n\nx Vous devez d\'abord supprimer ou déplacer les laboratoires de ce département.')
     } else {
       alert('Impossible de supprimer : ' + errorMsg)
     }

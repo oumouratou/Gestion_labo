@@ -51,12 +51,13 @@
             <table class="table table-bordered table-striped table-hover">
               <thead class="bg-success">
                 <tr>
-                  <th>N°</th>
+                  <th>Numéro</th>
                   <th>Nom</th>
                   <th>Prénom</th>
                   <th>Email</th>
                   <th>CIN</th>
                   <th>Département</th>
+                  <th>Accès</th>
                   <th>Créé le</th>
                   <th>Statut</th>
                   <th class="text-center">Actions</th>
@@ -70,6 +71,11 @@
                   <td>{{ e.email }}</td>
                   <td>{{ e.cin }}</td>
                   <td>{{ e.departement?.nom || 'N/A' }}</td>
+                  <td>
+                    <span :class="isEtudiantBlocked(e) ? 'badge badge-danger' : 'badge badge-success'">
+                      {{ isEtudiantBlocked(e) ? 'Bloqué' : 'Actif' }}
+                    </span>
+                  </td>
                   <td>{{ formatDate(e.createdAt) }}</td>
                   <td>
                     <span :class="!e.active ? 'badge badge-danger' : 'badge badge-success'">
@@ -78,17 +84,17 @@
                   </td>
                   <td class="text-center">
                     <div class="d-flex justify-content-center gap-2">
-                      <button 
-                        class="btn btn-danger btn-sm" 
-                        @click="handleBlock(e.id)"
-                        :disabled="!e.active"
+                      <button
+                        v-if="!isEtudiantBlocked(e)"
+                        class="btn btn-danger btn-sm"
+                        @click="handleBlockEtudiant(e)"
                       >
-                        <i class="fas fa-ban mr-1"></i>Bloquer
+                        <i class="fas fa-lock mr-1"></i>Bloquer
                       </button>
-                      <button 
-                        class="btn btn-success btn-sm" 
-                        @click="handleUnblock(e.id)"
-                        :disabled="e.active"
+                      <button
+                        v-else
+                        class="btn btn-success btn-sm"
+                        @click="handleUnblockEtudiant(e)"
                       >
                         <i class="fas fa-unlock mr-1"></i>Débloquer
                       </button>
@@ -172,7 +178,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import api from '@/Service/api'
-import { getEtudiants, createEtudiant, updateEtudiant, deleteUser, blockUser, unblockUser } from '@/Service/UserService'
+import { getEtudiants, createEtudiant, updateEtudiant, blockEtudiant, unblockEtudiant } from '@/Service/UserService'
 
 const etudiants = ref<any[]>([])
 const departements = ref<any[]>([])
@@ -291,24 +297,44 @@ async function handleSubmit() {
     closeModal()
   } catch (error: any) {
     console.error('Erreur backend:', error.response?.data || error.message)
-    alert('Impossible de sauvegarder l’étudiant. Vérifie les champs et le département.')
+    alert('Impossible de sauvegarder l"étudiant. Vérifie les champs et le département.')
   }
 }
 
-async function handleDelete(id: number) {
-  if (!confirm('Supprimer cet étudiant ?')) return
+function isEtudiantBlocked(etudiant: any): boolean {
+  if (!etudiant) return false
+  if (etudiant.blocked === true || etudiant.isBlocked === true || etudiant.bloque === true) return true
+  if (etudiant.active === false || etudiant.isActive === false || etudiant.enabled === false) return true
+  const etat = String(etudiant.etat || etudiant.statut || etudiant.accountStatus || '').toUpperCase()
+  return etat === 'BLOQUE' || etat === 'BLOCKED' || etat === 'INACTIF'
+}
+
+async function handleBlockEtudiant(etudiant: any) {
+  if (!confirm(`Bloquer l'étudiant ${etudiant.prenom} ${etudiant.nom} ?`)) return
   try {
-    await deleteUser(id)
+    await blockEtudiant(etudiant.id)
     await loadEtudiants()
-  } catch (error) {
-    console.error('Erreur suppression:', error)
+  } catch (error: any) {
+    console.error('Erreur blocage étudiant:', error)
+    alert(error.response?.data?.message || 'Impossible de bloquer cet étudiant.')
+  }
+}
+
+async function handleUnblockEtudiant(etudiant: any) {
+  if (!confirm(`Débloquer l'étudiant ${etudiant.prenom} ${etudiant.nom} ?`)) return
+  try {
+    await unblockEtudiant(etudiant.id)
+    await loadEtudiants()
+  } catch (error: any) {
+    console.error('Erreur déblocage étudiant:', error)
+    alert(error.response?.data?.message || 'Impossible de débloquer cet étudiant.')
   }
 }
 
 async function handleBlock(id: number) {
-  if (!confirm('Êtes-vous sûr de vouloir bloquer cet étudiant ?')) return
+  if (!confirm('`tes-vous sûr de vouloir bloquer cet étudiant ?')) return
   try {
-    await blockUser(id)
+    await blockEtudiant(id)
     await loadEtudiants()
   } catch (error: any) {
     console.error('Erreur blocage:', error)
@@ -317,9 +343,9 @@ async function handleBlock(id: number) {
 }
 
 async function handleUnblock(id: number) {
-  if (!confirm('Êtes-vous sûr de vouloir débloquer cet étudiant ?')) return
+  if (!confirm('`tes-vous sûr de vouloir débloquer cet étudiant ?')) return
   try {
-    await unblockUser(id)
+    await unblockEtudiant(id)
     await loadEtudiants()
   } catch (error: any) {
     console.error('Erreur déblocage:', error)

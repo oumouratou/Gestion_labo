@@ -17,30 +17,30 @@ export const laboratoires = ref<Laboratoire[]>([
 ])
 
 export const equipements = ref<Equipement[]>([
-  { id: 1, nom: 'PC Dell OptiPlex', laboratoireId: 1, etat: 'fonctionnel', description: 'Ordinateur de bureau', dateAcquisition: '2024-01-15' },
-  { id: 2, nom: 'Projecteur Epson', laboratoireId: 1, etat: 'fonctionnel', description: 'Projecteur HD', dateAcquisition: '2024-02-20' },
+  { id: 1, nom: 'PC Dell OptiPlex', laboratoireId: 1, etat: 'FONCTIONNEL', description: 'Ordinateur de bureau', dateAcquisition: '2024-01-15' },
+  { id: 2, nom: 'Projecteur Epson', laboratoireId: 1, etat: 'FONCTIONNEL', description: 'Projecteur HD', dateAcquisition: '2024-02-20' },
   { id: 3, nom: 'PC HP ProDesk', laboratoireId: 2, etat: 'en_panne', description: 'Ordinateur de bureau', dateAcquisition: '2023-06-10' },
-  { id: 4, nom: 'Oscilloscope', laboratoireId: 4, etat: 'fonctionnel', description: 'Oscilloscope numérique', dateAcquisition: '2023-09-05' }
+  { id: 4, nom: 'Oscilloscope', laboratoireId: 4, etat: 'FONCTIONNEL', description: 'Oscilloscope numérique', dateAcquisition: '2023-09-05' }
 ])
 
 export const etudiants = ref<User[]>([
-  { id: 1, nom: 'Martin', prenom: 'Alice', email: 'alice.martin@univ.fr', role: 'etudiant', departementId: 1 },
-  { id: 2, nom: 'Durand', prenom: 'Bob', email: 'bob.durand@univ.fr', role: 'etudiant', departementId: 1 },
-  { id: 3, nom: 'Bernard', prenom: 'Claire', email: 'claire.bernard@univ.fr', role: 'etudiant', departementId: 2 }
+  { id: 1, nom: 'Martin', prenom: 'Alice', email: 'alice.martin@univ.fr', role: 'ETUDIANT', departementId: 1, niveau: 'L3', classe: 'Info-A' },
+  { id: 2, nom: 'Durand', prenom: 'Bob', email: 'bob.durand@univ.fr', role: 'ETUDIANT', departementId: 1, niveau: 'L2', classe: 'Info-B' },
+  { id: 3, nom: 'Bernard', prenom: 'Claire', email: 'claire.bernard@univ.fr', role: 'ETUDIANT', departementId: 2, niveau: 'M1', classe: 'Math-1' }
 ])
 
 export const enseignants = ref<User[]>([
-  { id: 1, nom: 'Dupont', prenom: 'Jean', email: 'jean.dupont@univ.fr', role: 'enseignant', departementId: 1 },
-  { id: 2, nom: 'Moreau', prenom: 'Marie', email: 'marie.moreau@univ.fr', role: 'enseignant', departementId: 2 }
+  { id: 1, nom: 'Dupont', prenom: 'Jean', email: 'jean.dupont@univ.fr', role: 'ENSEIGNANT', departementId: 1 },
+  { id: 2, nom: 'Moreau', prenom: 'Marie', email: 'marie.moreau@univ.fr', role: 'ENSEIGNANT', departementId: 2 }
 ])
 
 export const reservations = ref<Reservation[]>([
-  { id: 1, etudiantId: 1, laboratoireId: 1, dateReservation: '2026-01-20', heureDebut: '08:00', heureFin: '10:00', statut: 'confirmee', motif: 'TP Programmation' },
-  { id: 2, etudiantId: 2, laboratoireId: 2, dateReservation: '2026-01-21', heureDebut: '14:00', heureFin: '16:00', statut: 'en_attente', motif: 'Projet personnel' }
+  { id: 1, etudiantId: 1, laboratoireId: 1, dateReservation: '2026-01-20', heureDebut: '08:00', heureFin: '10:00', statut: 'APPROUVEE', motif: 'TP Programmation' },
+  { id: 2, etudiantId: 2, laboratoireId: 2, dateReservation: '2026-01-21', heureDebut: '14:00', heureFin: '16:00', statut: 'EN_ATTENTE', motif: 'Projet personnel' }
 ])
 
 export const reclamations = ref<Reclamation[]>([
-  { id: 1, enseignantId: 1, equipementId: 3, description: 'Ordinateur ne démarre plus', dateReclamation: '2026-01-15', statut: 'en_cours', priorite: 'haute' }
+  { id: 1, titre: 'PC ne démarre plus', enseignantId: 1, equipementId: 3, description: 'Ordinateur ne démarre plus', dateCreation: '2026-01-15', statut: 'EN_COURS', priorite: 'HAUTE' }
 ])
 
 // ID counters
@@ -193,7 +193,7 @@ export const createReservation = (data: Omit<Reservation, 'id'>) => {
     dateReservation: data.dateReservation,
     heureDebut: data.heureDebut,
     heureFin: data.heureFin,
-    statut: 'en_attente',
+    statut: 'EN_ATTENTE',
     motif: data.motif
   }
   reservations.value.push(newRes)
@@ -214,7 +214,7 @@ export const updateReservation = (id: number, data: Partial<Reservation>) => {
 }
 
 export const cancelReservation = (id: number) => {
-  return updateReservation(id, { statut: 'annulee' })
+  return updateReservation(id, { statut: 'REFUSEE' })
 }
 
 export const deleteReservation = (id: number) => {
@@ -236,14 +236,15 @@ export const getReclamationsByEnseignant = (enseignantId: number) => {
   return mockResponse(filtered)
 }
 
-export const createReclamation = (data: { enseignantId: number; equipementId: number; description: string; priorite: 'basse' | 'moyenne' | 'haute' | 'urgente' }) => {
+export const createReclamation = (data: { enseignantId: number; equipementId: number; titre: string; description: string; priorite: Reclamation['priorite'] }) => {
   const newRec: Reclamation = { 
     id: nextReclamationId++, 
     enseignantId: data.enseignantId,
     equipementId: data.equipementId,
+    titre: data.titre,
     description: data.description,
-    dateReclamation: new Date().toISOString().split('T')[0] as string,
-    statut: 'en_attente',
+    dateCreation: new Date().toISOString().split('T')[0] as string,
+    statut: 'NOUVELLE',
     priorite: data.priorite
   }
   reclamations.value.push(newRec)
@@ -281,7 +282,7 @@ export const createEtudiant = (data: Omit<User, 'id'>) => {
     nom: data.nom,
     prenom: data.prenom,
     email: data.email,
-    role: 'etudiant',
+    role: 'ETUDIANT',
     departementId: data.departementId
   }
   etudiants.value.push(newEtud)
@@ -318,7 +319,7 @@ export const createEnseignant = (data: Omit<User, 'id'>) => {
     nom: data.nom,
     prenom: data.prenom,
     email: data.email,
-    role: 'enseignant',
+    role: 'ENSEIGNANT',
     departementId: data.departementId
   }
   enseignants.value.push(newEns)
@@ -352,8 +353,8 @@ export const getStats = () => mockResponse({
   totalEnseignants: enseignants.value.length,
   totalReservations: reservations.value.length,
   totalReclamations: reclamations.value.length,
-  equipementsDisponibles: equipements.value.filter(e => e.etat === 'fonctionnel').length,
+  equipementsDisponibles: equipements.value.filter(e => e.etat === 'FONCTIONNEL').length,
   equipementsEnPanne: equipements.value.filter(e => e.etat === 'en_panne').length,
-  reservationsEnAttente: reservations.value.filter(r => r.statut === 'en_attente').length,
-  reclamationsOuvertes: reclamations.value.filter(r => r.statut === 'en_attente' || r.statut === 'en_cours').length
+  reservationsEnAttente: reservations.value.filter(r => r.statut === 'EN_ATTENTE').length,
+  reclamationsOuvertes: reclamations.value.filter(r => r.statut === 'NOUVELLE' || r.statut === 'EN_COURS').length
 })

@@ -76,7 +76,7 @@
         <table class="table table-hover mb-0" v-if="recentReclamations.length">
           <thead class="bg-light">
             <tr>
-              <th>ID</th>
+              <th>Numéro</th>
               <th>Équipement</th>
               <th>Description</th>
               <th>Statut</th>
@@ -84,8 +84,8 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="rec in recentReclamations" :key="rec.id">
-              <td><strong>#{{ rec.id }}</strong></td>
+            <tr v-for="(rec, index) in recentReclamations" :key="rec.id">
+              <td><strong>{{ index + 1 }}</strong></td>
               <td>{{ rec.equipementNom || rec.equipement?.nom || 'N/A' }}</td>
               <td>{{ truncateText(rec.description, 40) }}</td>
               <td>
@@ -114,7 +114,7 @@
         <table class="table table-hover mb-0" v-if="recentLaboratoires.length">
           <thead class="bg-light">
             <tr>
-              <th>ID</th>
+              <th>Numéro</th>
               <th>Nom</th>
               <th>Département</th>
               <th>État</th>
@@ -122,8 +122,8 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="labo in recentLaboratoires" :key="labo.id">
-              <td><strong>#{{ labo.id }}</strong></td>
+            <tr v-for="(labo, index) in recentLaboratoires" :key="labo.id">
+              <td><strong>{{ index + 1 }}</strong></td>
               <td>{{ labo.nomLabo || labo.nom }}</td>
               <td><i class="fas fa-building mr-1"></i> {{ labo.departement?.nom || 'N/A' }}</td>
               <td>
@@ -163,7 +163,7 @@
         <table class="table table-hover mb-0" v-if="equipementsEnPanne.length">
           <thead class="bg-light">
             <tr>
-              <th>ID</th>
+              <th>Numéro</th>
               <th>Nom</th>
               <th>Laboratoire</th>
               <th>État</th>
@@ -171,8 +171,8 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="equip in equipementsEnPanne" :key="equip.id">
-              <td><strong>#{{ equip.id }}</strong></td>
+            <tr v-for="(equip, index) in equipementsEnPanne" :key="equip.id">
+              <td><strong>{{ index + 1 }}</strong></td>
               <td>{{ equip.nom }}</td>
               <td>{{ equip.laboratoire?.nomLabo || 'N/A' }}</td>
               <td>
@@ -252,7 +252,7 @@ const activeLaboratoires = computed(() =>
 const stats = computed(() => ({
   totalReclamations: reclamations.value.length,
   pendingReclamations: reclamations.value.filter(r => r.etat === 'NON_TRAITEE' || r.statut === 'NOUVELLE' || r.statut === 'EN_COURS').length,
-  resolvedReclamations: reclamations.value.filter(r => r.etat === 'TRAITEE' || r.etat === 'ANNULEE' || r.statut === 'RESOLUE').length,
+  resolvedReclamations: reclamations.value.filter(r => r.etat === 'TRAITEE' || r.statut === 'RESOLUE').length,
   laboratoires: laboratoires.value.length, // Compte TOUS les laboratoires
   equipements: equipementsCount.value
 }))
@@ -383,7 +383,7 @@ function formatEquipementEtat(etat: string): string {
 
 async function fetchData() {
   try {
-    // 🔥 Réclamations de l'enseignant connecté
+    // x Réclamations de l'enseignant connecté
     const resReclamations = await ReclamationService.getReclamationsEnseignantConnecte()
     console.log('Réclamations enseignant:', resReclamations.data)
     reclamations.value = Array.isArray(resReclamations.data) ? resReclamations.data : []
