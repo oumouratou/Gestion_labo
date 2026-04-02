@@ -70,11 +70,11 @@
         <!-- Liste des équipements -->
         <div class="row" v-else>
           <div class="col-md-4 mb-3" v-for="equip in filteredEquipements" :key="equip.id">
-            <div class="card" :class="getCardClass(equip.etat)">
+            <div class="card" :class="getCardClass(getEffectiveEtat(equip))">
               <div class="card-header">
                 <h3 class="card-title">{{ equip.nom }}</h3>
                 <div class="card-tools">
-                  <span :class="getEtatBadge(equip.etat)">{{ formatEtat(equip.etat) }}</span>
+                  <span :class="getEtatBadge(getEffectiveEtat(equip))">{{ formatEtat(getEffectiveEtat(equip)) }}</span>
                 </div>
               </div>
 
@@ -140,7 +140,7 @@
 
               <dt class="col-sm-4">État:</dt>
               <dd class="col-sm-8">
-                <span :class="getEtatBadge(selectedEquip.etat)">{{ formatEtat(selectedEquip.etat) }}</span>
+                <span :class="getEtatBadge(getEffectiveEtat(selectedEquip))">{{ formatEtat(getEffectiveEtat(selectedEquip)) }}</span>
               </dd>
 
               <dt class="col-sm-4">Date acquisition:</dt>
@@ -252,6 +252,39 @@ function getDeptIdFromEquip(equip?: Equipement | null): number | undefined {
   return labo?.departement?.id || labo?.departementId
 }
 
+function getLaboFromEquip(equip?: Equipement | null) {
+  if (!equip) return null
+  const laboId = equip.laboratoire?.id || equip.laboratoireId
+  if (!laboId) return null
+  return laboratoires.value.find(l => l.id === laboId) || equip.laboratoire || null
+}
+
+function isLaboActif(labo?: Laboratoire | null): boolean {
+  if (!labo) return true
+  if (typeof labo.etatLabo === 'string') {
+    return labo.etatLabo === 'ACTIF'
+  }
+  if (typeof labo.etat === 'string') {
+    return labo.etat === 'DISPONIBLE'
+  }
+  return true
+}
+
+function getEffectiveEtat(equip: Equipement): string {
+  const labo = getLaboFromEquip(equip)
+  if (labo && !isLaboActif(labo)) {
+    return 'INACTIF'
+  }
+  return (equip.etat || equip.statut || 'N/A').toString().toUpperCase()
+}
+
+function getDeptNomFromEquip(equip?: Equipement | null): string {
+  const deptId = getDeptIdFromEquip(equip)
+  if (!deptId) return 'N/A'
+  const dept = departements.value.find(d => d.id === deptId)
+  return dept ? dept.nom : 'N/A'
+}
+
 function getLaboNom(id?: number) {
   if (!id) return 'N/A'
   const labo = laboratoires.value.find(l => l.id === id)
@@ -268,7 +301,8 @@ function getCardClass(etat: string) {
   const classes: Record<string, string> = {
     FONCTIONNEL: 'card-outline card-success',
     EN_PANNE: 'card-outline card-danger',
-    EN_MAINTENANCE: 'card-outline card-warning'
+    EN_MAINTENANCE: 'card-outline card-warning',
+    INACTIF: 'card-outline card-secondary'
   }
   return classes[etat] || 'card-outline card-secondary'
 }
@@ -277,7 +311,8 @@ function getEtatBadge(etat: string) {
   const badges: Record<string, string> = {
     FONCTIONNEL: 'badge badge-success',
     EN_PANNE: 'badge badge-danger',
-    EN_MAINTENANCE: 'badge badge-warning'
+    EN_MAINTENANCE: 'badge badge-warning',
+    INACTIF: 'badge badge-secondary'
   }
   return badges[etat] || 'badge badge-secondary'
 }
@@ -286,7 +321,8 @@ function formatEtat(etat: string) {
   const labels: Record<string, string> = {
     FONCTIONNEL: 'Fonctionnel',
     EN_PANNE: 'En panne',
-    EN_MAINTENANCE: 'En maintenance'
+    EN_MAINTENANCE: 'En maintenance',
+    INACTIF: 'Inactif'
   }
   return labels[etat] || etat
 }
@@ -296,19 +332,23 @@ function showDetails(equip: Equipement) {
   showDetailsModal.value = true
 }
 
-// Vérifie si on peut réclamer cet équipement
-// On peut toujours réclamer un équipement (même fonctionnel)
 function canReclamer(equip: Equipement): boolean {
-  return true
+  return isLaboActif(getLaboFromEquip(equip) as Laboratoire | null)
 }
 
 // Tooltip pour le bouton réclamer
 function getReclamationTooltip(equip: Equipement): string {
+  if (!canReclamer(equip)) {
+    return 'Ce laboratoire est inactif'
+  }
   return 'Signaler un problème avec cet équipement'
 }
 
 // Texte du bouton réclamer
 function getReclamationButtonText(equip: Equipement): string {
+  if (!canReclamer(equip)) {
+    return 'Indisponible'
+  }
   return 'Réclamer'
 }
 
@@ -317,9 +357,12 @@ function goToReclamation(equip: Equipement) {
   if (!canReclamer(equip)) return
   
   const laboId = equip.laboratoire?.id || equip.laboratoireId
+  const deptId = getDeptIdFromEquip(equip)
   router.push({ 
     path: '/etudiant/nouvelle-reclamation', 
     query: { 
+      departementId: deptId,
+      departementNom: getDeptNomFromEquip(equip),
       equipementId: equip.id, 
       equipementNom: equip.nom,
       laboratoireId: laboId,

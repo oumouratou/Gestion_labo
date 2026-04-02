@@ -241,18 +241,27 @@ function formatEquipEtat(etat: string) {
 
 // Rediriger vers le formulaire de réclamation avec le labo pré-sélectionné
 function goToReclamation(labo: any) {
+  const departementId = labo.departement?.id || labo.departementId
   router.push({ 
     path: '/enseignant/nouvelle-reclamation', 
-    query: { laboratoireId: labo.id, laboratoireNom: labo.nomLabo } 
+    query: { 
+      departementId,
+      departementNom: labo.departement?.nom,
+      laboratoireId: labo.id,
+      laboratoireNom: labo.nomLabo 
+    } 
   })
 }
 
 // Rediriger vers réclamation avec équipement pré-sélectionné
 function goToReclamationEquip(labo: any, equip: any) {
   closeEquipmentsModal()
+  const departementId = labo.departement?.id || labo.departementId
   router.push({ 
     path: '/enseignant/nouvelle-reclamation', 
     query: { 
+      departementId,
+      departementNom: labo.departement?.nom,
       laboratoireId: labo.id, 
       laboratoireNom: labo.nomLabo,
       equipementId: equip.id,

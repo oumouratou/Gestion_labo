@@ -134,7 +134,7 @@
               <td>
                 <router-link 
                   v-if="labo.etatLabo === 'ACTIF'"
-                  :to="'/enseignant/nouvelle-reclamation?laboratoireId=' + labo.id" 
+                  :to="'/enseignant/nouvelle-reclamation?departementId=' + (labo.departement?.id || '') + '&laboratoireId=' + labo.id" 
                   class="btn btn-warning btn-sm"
                 >
                   <i class="fas fa-exclamation-triangle mr-1"></i> Réclamer
@@ -182,7 +182,7 @@
               </td>
               <td>
                 <router-link 
-                  :to="'/enseignant/nouvelle-reclamation?equipementId=' + equip.id + '&laboratoireId=' + (equip.laboratoire?.id || '')" 
+                  :to="'/enseignant/nouvelle-reclamation?departementId=' + (equip.laboratoire?.departement?.id || '') + '&equipementId=' + equip.id + '&laboratoireId=' + (equip.laboratoire?.id || '')" 
                   class="btn btn-warning btn-sm"
                 >
                   <i class="fas fa-exclamation-triangle mr-1"></i> Réclamer

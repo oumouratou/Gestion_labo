@@ -196,6 +196,12 @@ const description = ref<string>("")
 const priorite = ref<string>("MOYENNE")
 const isSubmitting = ref(false)
 
+function getQueryNumber(value: unknown): number | null {
+  const raw = Array.isArray(value) ? value[0] : value
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
 function isLaboActif(labo: any): boolean {
   // Spring/Front: etatLabo = 'ACTIF'|'INACTIF'
   if (typeof labo?.etatLabo === 'string') {
@@ -261,21 +267,28 @@ async function loadLaboratoires() {
     const res = await getLaboratoires()
     laboratoires.value = Array.isArray(res.data) ? res.data : []
     console.log("Laboratoires chargés:", laboratoires.value)
+
+    const queryDepartementId = getQueryNumber(route.query.departementId)
+    if (queryDepartementId) {
+      selectedDepartementId.value = queryDepartementId
+    }
     
     // Si on arrive avec un laboratoireId dans l'URL, pré-sélectionner département et labo
-    if (route.query.laboratoireId) {
-      const laboId = Number(route.query.laboratoireId)
+    const queryLaboId = getQueryNumber(route.query.laboratoireId)
+    if (queryLaboId) {
+      const laboId = queryLaboId
       const labo = laboratoires.value.find(l => l.id === laboId) as any
       const deptId = labo?.departementId || labo?.departement?.id
-      if (deptId) {
+      if (!selectedDepartementId.value && deptId) {
         selectedDepartementId.value = deptId
       }
       selectedLaboId.value = laboId
       await loadEquipements()
       
       // Si on a aussi un equipementId, le pré-sélectionner
-      if (route.query.equipementId) {
-        selectedEquipementId.value = Number(route.query.equipementId)
+      const queryEquipementId = getQueryNumber(route.query.equipementId)
+      if (queryEquipementId) {
+        selectedEquipementId.value = queryEquipementId
       }
     }
   } catch (e) {
